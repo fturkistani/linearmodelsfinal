@@ -1,0 +1,13 @@
+---
+title: "Code"
+author: "Ainsley McLaughlin"
+date: "2024-07-23"
+output: html_document
+---
+
+```{r}
+
+```
+
+# Q
+
