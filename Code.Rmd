@@ -11,11 +11,6 @@ library(tidyverse)
 
 data<-read.csv('DoctorContacts.csv')
 
-DoctorContacts <- data %>%
-  rename(visits = mdu, log_coinsurance = lc, log_api = lpi,
-         log_max_deductible = fmde, num_disease = ndisease,
-         log_income = linc, log_fam_size = lfam, schooling= educdec)
-View(DoctorContacts)
 =======
 library(readr)
 library(tidyverse)
@@ -27,6 +22,11 @@ data
 # Rename the columns:
 ```{r}
 >>>>>>> e66587173147d8bc3925e4e5967fc536ccece718
+DoctorContacts <- data %>%
+  rename(visits = mdu, log_coinsurance = lc, log_api = lpi,
+         log_max_deductible = fmde, num_disease = ndisease,
+         log_income = linc, log_fam_size = lfam, schooling= educdec)
+View(DoctorContacts)
 ```
 # Q
 
