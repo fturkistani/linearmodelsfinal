@@ -1,6 +1,6 @@
 ---
 title: "Code"
-author: "Ainsley McLaughlin"
+author: "Ainsley, Devon, Farah, Kayla"
 date: "2024-07-23"
 output: html_document
 ---
