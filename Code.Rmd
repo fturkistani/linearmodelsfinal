@@ -6,6 +6,7 @@ output: html_document
 ---
 
 ```{r}
+<<<<<<< HEAD
 library(tidyverse)
 
 data<-read.csv('DoctorContacts.csv')
@@ -15,7 +16,17 @@ DoctorContacts <- data %>%
          log_max_deductible = fmde, num_disease = ndisease,
          log_income = linc, log_fam_size = lfam, schooling= educdec)
 View(DoctorContacts)
+=======
+library(readr)
+library(tidyverse)
 ```
-
+```{r}
+data=read.csv("DoctorContacts.csv")
+data
+```
+# Rename the columns:
+```{r}
+>>>>>>> e66587173147d8bc3925e4e5967fc536ccece718
+```
 # Q
 
