@@ -6,8 +6,15 @@ output: html_document
 ---
 
 ```{r}
-
+library(readr)
+library(tidyverse)
 ```
-
+```{r}
+data=read.csv("DoctorContacts.csv")
+data
+```
+# Rename the columns:
+```{r}
+```
 # Q
 
