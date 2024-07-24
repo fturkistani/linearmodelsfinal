@@ -42,4 +42,53 @@ DoctorContacts$income = exp(DoctorContacts$log_income)
 DoctorContacts$family = exp(DoctorContacts$log_fam_size)
 ```
 
+```{r}
+# Assumptions
+# Model and preds with all predictors
+model1 <- lm(visits~. - visits,
+             data=DoctorContacts)
+coef(model1)
 
+DCs_pred <- mutate(DoctorContacts, predictions=fitted(model1),
+                        resid=residuals(model1))
+
+# Independent variances
+ggplot(DCs_pred, aes(x=predictions, y=resid)) + 
+  geom_point() +
+  geom_hline(yintercept = 0, color="red")
+# Woah, this assumption does not appear to be met.
+
+# Normally distributed variances
+ggplot(DCs_pred, aes(sample=resid)) +
+  stat_qq() +
+  stat_qq_line()
+# Looks like we have quite a few extreme observations on the upper end.
+```
+```{r}
+# Two sample t test to investigate mean doctor visits among women and men
+# First, subset males and females
+M_visits <- subset(DoctorContacts, sex == "male",
+select=c(visits, sex))
+
+F_visits <- subset(DoctorContacts, sex == "female",
+select=c(visits, sex))
+```
+
+```{r}
+t.test(M_visits$visits, F_visits$visits, alternative = "two.sided", mu = 0, paired = FALSE, conf.level = 0.95)
+# H0: The mean number of doctor visits for men and women are equal
+# Ha: The mean number of doctor visits for men and women are not equal
+
+# Since the p value is 2.2e-16, which less than 0.05, we reject the null hypothesis. We have sufficient evidence to conclude that the mean number of doctor visits for men and women are not equal.
+
+# Since both the lower and upper limits of the confidence interval are negative, we can conclude that on average, men have between approximately 0.707 and 0.953 less doctor visits than women.
+```
+
+```{r}
+# Really wanted to double check since that result surprised me.
+mean(F_visits$visits)
+```
+
+```{r}
+mean(M_visits$visits)
+```
