@@ -1,0 +1,45 @@
+---
+title: "Linear Models for Data Science Final Project"
+author: "Christine George"
+date: "7/24/2024"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(warning = FALSE, message = FALSE) 
+```
+
+```{r}
+# Read in data
+setwd("C:/Users/chris/Documents/UVA/STAT_6021/FP")
+DoctorContacts <- read.csv("DoctorContacts.csv")
+```
+
+```{r}
+# Load packages
+library(tidyverse)
+```
+
+```{r}
+# Rename columns
+DoctorContacts <- DoctorContacts %>%
+  rename(visits = mdu, log_coinsurance = lc, log_api = lpi,
+         log_max_deductible = fmde, num_disease = ndisease,
+         log_income = linc, log_fam_size = lfam, schooling= educdec)
+```
+
+```{r}
+# Delete extra index column
+DoctorContacts <- select(DoctorContacts, -rownames) 
+```
+
+```{r}
+# Undo log transformations
+DoctorContacts$insurance = exp(DoctorContacts$log_coinsurance)
+DoctorContacts$payment = exp(DoctorContacts$log_api)
+DoctorContacts$deductible = exp(DoctorContacts$log_max_deductible)
+DoctorContacts$income = exp(DoctorContacts$log_income)
+DoctorContacts$family = exp(DoctorContacts$log_fam_size)
+```
+
+
