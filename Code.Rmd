@@ -13,6 +13,11 @@ library(tidyverse)
 data=read.csv("DoctorContacts.csv")
 data
 ```
+# Data Cleaning:
+Data preparation and cleaning: some data cleaning. Depending on how clean your dataset is,
+this might include: renaming columns, removing columns or rows, mutating columns,
+subsetting (or filtering) the data based on interesting questions to investigate
+
 # Rename the columns:
 ```{r}
 ```
