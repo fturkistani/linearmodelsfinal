@@ -10,22 +10,14 @@ knitr::opts_chunk$set(warning = FALSE, message = FALSE)
 
 ```{r}
 # Read in data
-DoctorContacts <- read.csv("DoctorContacts.csv")
+DoctorContacts <- read.csv("UpdatedDoctorContacts.csv")
+head(DoctorContacts)
 ```
 
 ```{r}
 # Load packages
 library(tidyverse)
 library(ggplot2)
-```
-
-```{r}
-# Rename columns
-DoctorContacts <- DoctorContacts %>%
-  rename(visits = mdu, log_coinsurance = lc, log_api = lpi,
-         log_max_deductible = fmde, num_disease = ndisease,
-         log_income = linc, log_fam_size = lfam, schooling= educdec)
-head(DoctorContacts)
 ```
 Get column names:
 
@@ -34,12 +26,13 @@ names(DoctorContacts)
 ```
 
 (Visualization): 
-Does an individual’s number of chronic diseases (num_disease) affect their self-rate health score (health)? 
+Does an individual’s number of chronic diseases (numerical) affect their self-rate health score (categorical)? 
 Null: An individual’s number of chronic diseases (num_disease) has no effect on their self-rate health score (health).
 Alt: An individual’s number of chronic diseases (num_disease) has an effect on their self-rate health score (health).
 
 ```{r}
-table(DoctorContacts$health, DoctorContacts$num_disease)
+DoctorContacts$health <- as.factor(DoctorContacts$health)
+head(DoctorContacts)
 ```
 
 
@@ -47,14 +40,62 @@ table(DoctorContacts$health, DoctorContacts$num_disease)
 ggplot(DoctorContacts, aes(x=health, y=num_disease, fill=health)) + geom_boxplot() 
 ```
 
+
+(Multilinear Model): 
+Does the household head’s years of schooling (schooling), family income (income), family size (family),  statistically significant predictors of deductible rate (deductible).
+Null: None of the predictors among the household head’s years of schooling (schooling), family income (income), and family size (family) are helpful in predicting deductible rate (deductible).
+Alt: At least one of the predictors among the household head’s years of schooling (schooling), family income (income), and family size (family) are helpful in predicting deductible rate (deductible).
+
+create a model:
+
 ```{r}
-anova<-aov(num_disease~health, data=DoctorContacts)
-summary(anova)
+deductibleAffected_model <- lm(deductible ~ schooling + income + family, data = DoctorContacts)
+coef(deductibleAffected_model)
+```
+
+```{r}
+summary(deductibleAffected_model)
+```
+
+```{r}
+0.05/3
+```
+
+compare the p values to corrected alpha^ 
+
+schooling   0.00116 < alpha
+income      < 2e-16 < alpha
+family      0.09696 > alpha
+
+therefore family looks sus and maybe we need to drop it 
+
+```{r}
+anova(deductibleAffected_model)
+```
+check the AIC:
+
+```{r}
+library(MASS)
+aic<-stepAIC(deductibleAffected_model, direction='both')
 ```
 ```{r}
-TukeyHSD(anova, conf.level = 0.95)
+library(car)
+vif(aic)
 ```
+
+
+
+although the vif values look fine, its a little sus because the p value for family is larger than the adjusted value. verify this with prof/others
+
+
 ```{r}
-plot(TukeyHSD(anova, conf.level = 0.95))
+avPlots(deductibleAffected_model)
 ```
+
+Income  and schooling seem to have an effect. Family is not discernible by the graph. The VIFs show there is not co-linearity. 
+
+
+The model: 
+max_deductible = 419.52262482 * 10.16056417(schooling) + 0.03535185(family) + 7.55246798(income)
+
 
