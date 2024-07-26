@@ -40,7 +40,6 @@ head(DoctorContacts)
 ggplot(DoctorContacts, aes(x=health, y=num_disease, fill=health)) + geom_boxplot() 
 ```
 
-
 (Multilinear Model): 
 Does the household head’s years of schooling (schooling), family income (income), family size (family),  statistically significant predictors of deductible rate (deductible).
 Null: None of the predictors among the household head’s years of schooling (schooling), family income (income), and family size (family) are helpful in predicting deductible rate (deductible).
@@ -72,6 +71,25 @@ therefore family looks sus and maybe we need to drop it
 ```{r}
 anova(deductibleAffected_model)
 ```
+check linearity assumptions:
+
+```{r}
+exp_pred <- mutate(DoctorContacts, predictions=fitted(deductibleAffected_model), residual=residuals(deductibleAffected_model))
+head(exp_pred)
+```
+
+```{r}
+exp_pred <- log_pred[-c(1:11, 13:18)]
+tail(exp_pred)
+```
+
+```{r}
+ggplot(exp_pred, aes(x=predictions, y=residual))+geom_point()+
+  geom_hline(yintercept=0, color='red')
+```
+```{r}
+ggplot(exp_pred, aes(sample=residual))+stat_qq() +stat_qq_line()
+```
 check the AIC:
 
 ```{r}
@@ -97,5 +115,22 @@ Income  and schooling seem to have an effect. Family is not discernible by the g
 
 The model: 
 max_deductible = 419.52262482 * 10.16056417(schooling) + 0.03535185(family) + 7.55246798(income)
+
+
+visualizing all variables:
+
+ [1] "X"                  "visits"             "log_coinsurance"    "idp"                "log_api"           
+ [6] "log_max_deductible" "physlim"            "num_disease"        "health"             "log_income"        
+[11] "log_fam_size"       "schooling"          "age"                "sex"                "child"             
+[16] "black"              "insurance"          "payment"            "deductible"         "income"            
+[21] "family"  
+
+```{r}
+long<-gather(DoctorContacts, key='predictor', value='value', visits,
+log_coinsurance, idp, physlim, health, num_disease, log_income, log_fam_size, schooling,  
+age, sex, child, black, insurance, payment, income, family, log_max_deductible, deductible)
+ggplot(long, aes(x=value, y=log_api, color=predictor))+geom_point()+
+  facet_wrap(~predictor, scales='free_x')
+```
 
 
