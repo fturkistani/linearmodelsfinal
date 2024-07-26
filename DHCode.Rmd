@@ -1,0 +1,64 @@
+---
+title: "DevonCodeFP"
+author: "DH"
+date: "2024-07-25"
+output: html_document
+---
+
+```{r}
+library(tidyverse)
+```
+
+```{r}
+data<-read.csv('DoctorContacts.csv')
+View(data)
+```
+
+```{r}
+DoctorContacts <- data %>%
+  rename(visits = mdu, log_coinsurance = lc, log_api = lpi,
+         log_max_deductible = fmde, num_disease = ndisease,
+         log_income = linc, log_fam_size = lfam, schooling= educdec)
+```
+
+```{r}
+DoctorContacts$insurance = exp(DoctorContacts$log_coinsurance)
+DoctorContacts$payment = exp(DoctorContacts$log_api)
+DoctorContacts$deductible = exp(DoctorContacts$log_max_deductible)
+DoctorContacts$income = exp(DoctorContacts$log_income)
+DoctorContacts$family = exp(DoctorContacts$log_fam_size)
+View(DoctorContacts)
+```
+
+```{r}
+DoctorContacts$health <- factor(DoctorContacts$health, 
+                                levels = c('excellent', 'good', 'fair', 'poor'))
+ggplot(DoctorContacts, aes(x=health, y=schooling, fill=health)) + geom_boxplot()
+```
+
+```{r}
+anova <- aov(schooling~health, data=DoctorContacts)
+summary(anova)
+```
+There is an extremely small p-value here, which provides strong evidence to
+reject the null hypothesis that the family head's years of schooling have no 
+significant difference on how patients self report their own health.
+One thing to note is the very high SSE value (146801). This means that most of
+the variation in the response cannot be explained by a linear regression model.
+This makes sense because since one of these values is categorical, it would be
+difficult to represent it as a linear regression model.
+
+```{r}
+TukeyHSD(anova, conf.level = 0.95)
+```
+These results show that all tests are statistically significant. The mean of
+schooling of people who reported their own health as excellent is higher than
+those who reported good, fair or poor in that order.
+This data is observational, so we can not make cause and effect statements,
+but we are 95% confident...
+
+```{r}
+plot(TukeyHSD(anova))
+```
+
+
