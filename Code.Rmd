@@ -48,3 +48,7 @@ updatedr$sqrt_family = sqrt(updatedr$family)
 View(updatedr)
 ```
 
+```{r}
+write.csv(updatedr, file="DrContactsNew.csv")
+```
+
