@@ -90,6 +90,17 @@ ggplot(exp_pred, aes(x=predictions, y=residual))+geom_point()+
 ```{r}
 ggplot(exp_pred, aes(sample=residual))+stat_qq() +stat_qq_line()
 ```
+```{r}
+df_for_cor <- exp_pred[,c(-5, -6)]
+cor_mat<-round(cor(df_for_cor), 2)
+cor_mat
+```
+
+```{r}
+library(ggcorrplot)
+ggcorrplot(cor_mat, lab=T, type='lower')
+```
+
 check the AIC:
 
 ```{r}
@@ -117,7 +128,7 @@ The model:
 max_deductible = 419.52262482 * 10.16056417(schooling) + 0.03535185(family) + 7.55246798(income)
 
 
-visualizing all variables:
+visualizing all variables (in curiosity):
 
  [1] "X"                  "visits"             "log_coinsurance"    "idp"                "log_api"           
  [6] "log_max_deductible" "physlim"            "num_disease"        "health"             "log_income"        
