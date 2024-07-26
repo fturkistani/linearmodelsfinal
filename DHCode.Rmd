@@ -31,6 +31,11 @@ View(DoctorContacts)
 ```
 
 ```{r}
+
+```
+
+
+```{r}
 DoctorContacts$health <- factor(DoctorContacts$health, 
                                 levels = c('excellent', 'good', 'fair', 'poor'))
 ggplot(DoctorContacts, aes(x=health, y=schooling, fill=health)) + geom_boxplot()
