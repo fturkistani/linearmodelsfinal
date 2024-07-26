@@ -35,3 +35,16 @@ View(DoctorContacts)
 ```
 # Q
 
+```{r}
+updatedr<-read.csv('UpdatedDoctorContacts.csv')
+```
+
+```{r}
+updatedr$sqrt_insurance = sqrt(updatedr$insurance)
+updatedr$sqrt_payment = sqrt(updatedr$payment)
+updatedr$sqrt_deductible = sqrt(updatedr$deductible)
+updatedr$sqrt_income = sqrt(updatedr$income)
+updatedr$sqrt_family = sqrt(updatedr$family)
+View(updatedr)
+```
+
