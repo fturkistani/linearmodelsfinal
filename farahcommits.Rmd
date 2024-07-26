@@ -100,6 +100,7 @@ cor_mat
 library(ggcorrplot)
 ggcorrplot(cor_mat, lab=T, type='lower')
 ```
+there is no fear of clinearity. 
 
 check the AIC:
 
