@@ -68,3 +68,6 @@ ggplot(final_multi_preds, aes(x = value, y = coinsurance, color = predictor)) +
 ```
 
 Since linearity fails we will not move on with this model.
+
+
+

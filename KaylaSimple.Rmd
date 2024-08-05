@@ -282,4 +282,3 @@ cor_coef
 Based off of the graph of the number of diseases versus the co-insurance rate, there is obviously little to no correlation. Analyzing the correlation coefficient, we see that it is 0.04. A correlation coefficient close to +/- 1 is indicative of a strong positive/negative relationship, respectively. A correlation coefficient close to 0 indicates that there is no linear relationship between the two variables being studied. Since 0.04 is close to 0, we can conclude that there is no relationship between the number of diseases and the co-insurance rate.
 
 
-

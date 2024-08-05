@@ -97,7 +97,6 @@ Coefficient interpretation:
 
 
 
-
 Predictions with the logistic model
 ```{r}
 new_dat <- drdata_clean[1:2,]
