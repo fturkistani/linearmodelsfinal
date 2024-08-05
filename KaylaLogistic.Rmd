@@ -1,0 +1,106 @@
+---
+title: "Logistic Model for Sex Prediction"
+author: "Kayla Lee"
+date: "2024-08-05"
+output: html_document
+---
+
+Set up
+```{r}
+setwd('/Users/leeka/Downloads/linearmodelsfinal')
+library(readr)
+library(tidyverse)
+library(ggplot2)
+library(ggcorrplot)
+library(car)
+# library(MASS)   # messes with select function in dplyr
+library(broom)
+library(dplyr)
+library(caret)
+library(glmnet)
+library(pls)
+
+drdata <- read_csv("DrContactsNew.csv")
+```
+
+
+Data preparation: 'sex' is the target variable and it has values "M" and "F"
+  Recode 'sex': 1 for male and 0 for female
+```{r}
+drdata_clean <- drdata %>%
+  mutate(sex_recode = ifelse(sex == "male", 1, 0)) %>%
+  select(-c(...1, X, log_coinsurance, log_api, log_max_deductible, log_income, log_fam_size,
+            sqrt_insurance, sqrt_payment, sqrt_deductible, sqrt_income, sqrt_family))
+
+head(drdata_clean)
+```
+
+Data exploration: visualizing the distribution of 'sex_recode'
+```{r}
+ggplot(drdata_clean, aes(x = physlim, fill = factor(sex_recode), color = factor(sex_recode))) +
+  geom_bar()
+```
+
+```{r}
+numeric_vars <- drdata_clean %>% 
+  select_if(is.numeric)
+corr_matrix <- round(cor(numeric_vars), 2)
+
+ggcorrplot::ggcorrplot(corr_matrix, lab = TRUE, type = "lower")
+```
+
+There do not seem to be any collinearity issues with these predictors.
+
+Logistic Regression Model
+```{r}
+logit_model1 <- glm(sex_recode~.-sex, data = drdata_clean, family = "binomial")
+
+summary(logit_model1)
+```
+
+Selecting useful predictors for predicting sex based off health information.
+Hypothesis test: if the p-value corresponding to each of the predictors is less than 5%, then that predictor variable is a useful predictor for sex. 
+
+It appears schooling (0.06), payment (0.79), and deductible (0.23) are not good predictors for sex. For now, idp, physlim, and health will also be removed from the model.
+
+We tried removing health also, but removing health actually increased the AIC.
+
+```{r}
+logit_model2 <- glm(sex_recode~.-sex-idp-physlim-schooling-payment-deductible, 
+                         data = drdata_clean, family = "binomial")
+
+summary(logit_model2)
+```
+
+```{r}
+aic <- MASS::stepAIC(logit_model1, direction = "both", trace=FALSE)
+summary(aic)
+```
+
+Using aic, we get a model with the lowest AIC. This model keeps visits, num_disease, health, schooling, age, child, black, insurance, deductible, income, and family as predictors. I.e. it removed idp, physlim, and payment.
+
+Model: Ln(p/(1-p)) = 1.108 + 0.967*visits + 0.935*num_disease + 1.025*I_healthfair + 0.904*I_healthgood + 0.966*I_healthpoor + 1.011*Schooling + 1.008*age + 1.453*I_childtrue + 0.734*I_blacktrue + 0.999*insurance + 1*deductible + 1*income + 1.025*family 
+
+```{r}
+car::vif(aic)
+```
+
+All vif values are all less than 5, so no multicollinearity.
+
+```{r}
+exp_coef <- exp(coef(aic))
+
+exp_coef
+```
+
+Coefficient interpretation: 
+
+
+
+
+Predictions with the logistic model
+```{r}
+new_dat <- drdata_clean[1:2,]
+
+predict(aic, new_dat, type = "response")
+```
