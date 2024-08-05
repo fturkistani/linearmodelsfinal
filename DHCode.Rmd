@@ -4,9 +4,12 @@ author: "DH"
 date: "2024-07-25"
 output: html_document
 ---
-
+Data cleaning
 ```{r}
 library(tidyverse)
+library(ggplot2)
+library(caret)
+library(pls)
 ```
 
 ```{r}
@@ -29,11 +32,16 @@ DoctorContacts$income = exp(DoctorContacts$log_income)
 DoctorContacts$family = exp(DoctorContacts$log_fam_size)
 View(DoctorContacts)
 ```
-
+The most updated version of the csv is now called DrContactsNew. It includes
+log and sqrt transformations as well as the original raw data(that we had to
+untransform from the log).
 ```{r}
 
 ```
+Data Visualization
 
+Null hypothesis = There is no relationship between mean health score and education
+Alternative hypothesis = At least one of the means is different from the others
 
 ```{r}
 DoctorContacts$health <- factor(DoctorContacts$health, 
@@ -65,5 +73,84 @@ but we are 95% confident...
 ```{r}
 plot(TukeyHSD(anova))
 ```
+Logistic Regression
+```{r}
+drs<-read.csv('DrContactsNew.csv')
+View(drs)
+```
+
+Transform health column into binary as column 'condition'
+Used log data from original data set for this
+```{r}
+ drs1<- DoctorContacts %>%
+  mutate(condition = case_when(
+    health %in% c("poor", "fair") ~ "unhealthy",
+    health %in% c("good", "excellent") ~ "healthy",
+    TRUE ~ as.character(health)
+  ))
+
+View(drs1)
+```
+
+Bar graph shows relationship between condition and sex. (Just for fun)
+```{r}
+ggplot(drs1, aes(x=sex, fill=factor(condition), color=factor(condition)))+
+  geom_bar(position='fill')
+```
 
 
+Make all categoricals factors (0,1)
+```{r}
+drs2<-drs1[, -c(1,9)]%>%
+  mutate(physlim=ifelse(physlim=="TRUE", 1,0),
+         idp=ifelse(idp=="TRUE", 1,0),
+         sex=ifelse(sex=="male", 1,0),
+         child=ifelse(child=="TRUE", 1,0),
+         black=ifelse(black=="TRUE", 1,0),
+         condition=ifelse(condition=="healthy", 1,0))
+View(drs2)
+```
+
+Remove response/unneeded variables, make correlation matrix
+```{r}
+dat<-drs2[, -15]
+cor_mat<-round(cor(dat),2)
+ggcorrplot::ggcorrplot(cor_mat, lab=T, type='lower')
+```
+There is multicollinearity between age and child (to be expected) and
+log_max_deductible and log_coinsurance (also to be expected). I will remove
+log_max_deductible and child.
+
+```{r}
+dat2<-dat[, -c(5,13)]
+cor_mat2<-round(cor(dat2),2)
+ggcorrplot::ggcorrplot(cor_mat2, lab=T, type='lower')
+```
+
+```{r}
+drs3<-drs2[, -c(5,13)]
+```
+
+Create logistic regression model using glm
+```{r}
+logit_model1<-glm(condition~., drs3, family='binomial')
+summary(logit_model1)
+```
+It looks like family size, coinsurance, idp, and sex are not signficant,
+so I will remove them in the next iteration.
+
+```{r}
+logit_model2<-glm(condition~.-idp-log_coinsurance-log_fam_size-sex, drs3, family='binomial')
+summary(logit_model2)
+```
+Yay! Check with AIC
+```{r}
+aic<-MASS::stepAIC(logit_model1, direction='both', trace=F)
+summary(aic)
+```
+Matches logit_model2, yay!
+
+```{r}
+car::vif(logit_model2)
+```
+Low VIF suggests no multicollinearity (also shown by correlation matrix?) Yay!
