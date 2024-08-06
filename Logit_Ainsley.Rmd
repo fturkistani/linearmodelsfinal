@@ -1,0 +1,146 @@
+---
+title: "Logit_Ainsley"
+author: "Ainsley McLaughlin"
+date: "2024-08-06"
+output: html_document
+---
+
+```{r}
+everything_data<-read.csv("DrContactsNew.csv")
+head(everything_data)
+```
+
+#
+```{r}
+#everything updated
+everything_data2<-everything_data%>%
+  mutate(condition = case_when(
+    health %in% c("poor", "fair") ~ "unhealthy",
+    health %in% c("good", "excellent") ~ "healthy",
+    TRUE ~ as.character(health)
+  ))
+
+View(everything_data2)
+```
+#
+
+```{r}
+# make all binary zero or 1
+everything_data3<-everything_data2%>%
+  mutate(physlim=ifelse(physlim=="TRUE", 1,0),
+         idp=ifelse(idp=="TRUE", 1,0),
+         sex=ifelse(sex=="male", 1,0),
+         child=ifelse(child=="TRUE", 1,0),
+         black=ifelse(black=="TRUE", 1,0),
+         condition=ifelse(condition=="healthy", 1,0))
+View(everything_data3)
+```
+#
+```{r}
+#see columns of everything data:
+colnames(everything_data3)  
+```
+# subset the data so it it using the log info and updated binary
+```{r}
+# took out x's and health which is condition and all exp and sqrted
+log_data<-everything_data3[,-c(1,2,10,18:27)]
+colnames(log_data)
+```
+# use aic with logit for response as "black"
+
+```{r}
+# build the logit model with everything but hthe response itself
+logit_model1<-glm(black~.-black, log_data, family='binomial')
+summary(logit_model1)
+#looks like some are not helpful predictors
+```
+#
+```{r}
+# aic to choose predictors
+aic<-MASS::stepAIC(logit_model1, direction='both', trace=F)
+summary(aic)
+# looks like it took out the insignificant ones: age (child also seems insinificant)
+```
+# look at multicollinearity and vif of variables that aic kept and without the response
+```{r}
+# also take out categorical
+colnames(log_data)
+
+dat<-log_data[,-c(11,14)]
+cor_mat<-round(cor(dat),2)
+ggcorrplot::ggcorrplot(cor_mat, lab=T, type='lower')
+```
+#
+
+```{r}
+cor(log_data[,"log_coinsurance"],log_data[,"log_max_deductible"])
+# looks like significant multicollinearity between those two vairables, I will decide to throw one of those out too in my final logit model
+```
+#
+
+```{r}
+# look at vif
+logit_model2<-glm(black ~ visits + log_coinsurance + idp + log_api + 
+    log_max_deductible + physlim + num_disease + log_income + 
+    log_fam_size + schooling + sex + child + condition, family = "binomial", data = log_data)
+car::vif(logit_model2)
+# confirms one of coinsurance or max deductable needs to go
+```
+
+#
+```{r}
+# final model (took out coinsurance)
+logit_model_final<-glm(black ~ visits  + idp + log_api + 
+    log_max_deductible + physlim + num_disease + log_income + 
+    log_fam_size + schooling + sex + child + condition, family = "binomial", data = log_data)
+summary(logit_model_final)
+```
+```{r}
+# redo vif:
+car::vif(logit_model_final)
+# see all vif's very reasonable
+```
+```{r}
+# make a prediction
+# new data without the response variable--SHOULD I TAKE IT OUT???
+# 1 is black, 69 is not black in reality
+new_dat<-log_data[c(1,69), -14]
+predict(logit_model_final,new_dat,type = "response")
+```
+# Interpretation:
+Are they probabilities for whether the household is black?? Do I need to exponentiate?
+
+#
+```{r}
+
+```
+
+# NOTE: STILL NEED TO CHECK ASSUMPTIONS!!! 
+```{r}
+
+```
+
+#
+```{r}
+
+```
+
+#
+
+```{r}
+
+```
+#
+
+```{r}
+
+```
+#
+
+```{r}
+
+```
+#
+```{r}
+
+```
