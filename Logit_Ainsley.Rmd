@@ -50,7 +50,7 @@ colnames(log_data)
 
 ```{r}
 # build the logit model with everything but hthe response itself
-logit_model1<-glm(black~.-black, log_data, family='binomial')
+logit_model1<-glm(physlim~.-physlim, log_data, family='binomial')
 summary(logit_model1)
 #looks like some are not helpful predictors
 ```
@@ -66,7 +66,7 @@ summary(aic)
 # also take out categorical
 colnames(log_data)
 
-dat<-log_data[,-c(11,14)]
+dat<-log_data[,-c(6)]
 cor_mat<-round(cor(dat),2)
 ggcorrplot::ggcorrplot(cor_mat, lab=T, type='lower')
 ```
@@ -76,23 +76,24 @@ ggcorrplot::ggcorrplot(cor_mat, lab=T, type='lower')
 cor(log_data[,"log_coinsurance"],log_data[,"log_max_deductible"])
 # looks like significant multicollinearity between those two vairables, I will decide to throw one of those out too in my final logit model
 ```
-#
+# Also look at VIF and throw out the high ones
 
 ```{r}
 # look at vif
-logit_model2<-glm(black ~ visits + log_coinsurance + idp + log_api + 
-    log_max_deductible + physlim + num_disease + log_income + 
-    log_fam_size + schooling + sex + child + condition, family = "binomial", data = log_data)
+logit_model2<-glm(physlim ~ visits + log_coinsurance + idp + log_api + 
+    log_max_deductible + num_disease + log_fam_size + schooling + 
+    child + black + condition, family = "binomial", data = log_data)
 car::vif(logit_model2)
 # confirms one of coinsurance or max deductable needs to go
 ```
 
 #
+# threw out coinsurance
 ```{r}
 # final model (took out coinsurance)
-logit_model_final<-glm(black ~ visits  + idp + log_api + 
-    log_max_deductible + physlim + num_disease + log_income + 
-    log_fam_size + schooling + sex + child + condition, family = "binomial", data = log_data)
+logit_model_final<-glm(physlim ~ visits + idp + log_api + 
+    log_max_deductible + num_disease + log_fam_size + schooling + 
+    child + black + condition, family = "binomial", data = log_data)
 summary(logit_model_final)
 ```
 ```{r}
@@ -101,46 +102,87 @@ car::vif(logit_model_final)
 # see all vif's very reasonable
 ```
 ```{r}
+#colnames(log_data)
 # make a prediction
 # new data without the response variable--SHOULD I TAKE IT OUT???
-# 1 is black, 69 is not black in reality
-new_dat<-log_data[c(1,69), -14]
+# 1 is no, 27 is yes in reality, took out col 6= physlim
+new_dat<-log_data[c(1,27), -6]
 predict(logit_model_final,new_dat,type = "response")
 ```
 # Interpretation:
-Are they probabilities for whether the household is black?? Do I need to exponentiate?
 
-#
+
+
+
+# NOTE: STILL NEED TO CHECK ASSUMPTIONS (not necessarily that important) 
 ```{r}
-
+long<-gather(log_data, key='predictor', value='value', visits, idp, log_api, log_max_deductible, 
+    num_disease, log_fam_size, schooling, child, black,
+    condition)
+ggplot(long, aes(x=value, y=physlim, color=predictor))+geom_point()+
+  facet_wrap(~predictor, scales='free_x')
 ```
 
-# NOTE: STILL NEED TO CHECK ASSUMPTIONS!!! 
+# Also check accuracy with confusion matrix 
 ```{r}
-
+add_data<-mutate(log_data, prob=predict(logit_model_final, type="response"), 
+             log_odds=log(prob/(1-prob)),
+             classify=ifelse(prob>0.5, 1,0))
+table(add_data$classify, add_data$physlim)
 ```
+# accuracy:16499+433/all= 16932/20186=0.8387
 
+# Also build ROC curve - look at this for sure
+
+```{r}
+# tenfold cv
+# Ensure the response variable is a factor with two levels
+log_data$physlim_words<-everything_data3$physlim
+log_data$physlim_words <- factor(log_data$physlim_words)
+levels(log_data$physlim_words) <- make.names(levels(log_data$physlim_words))
+
+ctrl <- trainControl(method = "cv", 
+                     number = 10, 
+                     summaryFunction = twoClassSummary,
+                     classProbs = TRUE, 
+                     savePredictions = TRUE)
+
+logit_model_final2 <- train(physlim_words ~ visits + idp + log_api + 
+                            log_max_deductible + num_disease + log_fam_size + schooling +  child + black + condition, 
+                            data = log_data, 
+                            method = 'glm', 
+                            family = 'binomial', 
+                            trControl = ctrl, 
+                            metric = "ROC")
+# it is same as above but it includes the cross val and roc curve
+summary(logit_model_final2)
+```
+#
+
+```{r}
+# create column called predictions
+predictions<-logit_model_final2$pred
+predictions
+```
+#
+# get confusion matrix
+
+```{r}
+# but this one has been cross validated
+table(predictions$pred, predictions$obs)
+# picks anything above 50% as win and below is loss for the preditions
+```
+# Accuracy with cross validated model: 
+16499+432/(all)=16931/20186=0.83875
+# ROC
+```{r}
+library(pROC)
+roc_thing<-roc(predictions$obs, predictions$X1)
+roc_thing
+```
 #
 ```{r}
-
-```
-
-#
-
-```{r}
-
-```
-#
-
-```{r}
-
-```
-#
-
-```{r}
-
-```
-#
-```{r}
-
+# tell it TP rate (sensitivity) and FP rate (1-specificity)
+roc_df<-data.frame(TPR=roc_thing$sensitivities, FPR=1-roc_thing$specificities)
+ggplot(roc_df, aes(x=FPR, y=TPR))+geom_line(color="blue")
 ```

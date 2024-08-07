@@ -7,7 +7,7 @@ output: html_document
 
 Set up
 ```{r}
-setwd('/Users/leeka/Downloads/linearmodelsfinal')
+#setwd('/Users/leeka/Downloads/linearmodelsfinal')
 library(readr)
 library(tidyverse)
 library(ggplot2)

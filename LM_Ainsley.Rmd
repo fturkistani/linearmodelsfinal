@@ -134,7 +134,7 @@ anova(partial_a,model_a)
 # we can see that income and/or coinsurance do contribute significantly to predict visits
 ```
 
-#
+# HERE IS RELEVANT USING AIC
 ```{r}
 # read in new csv
 dc_update<-read.csv("DrContactsNew.csv")
@@ -261,21 +261,151 @@ car::vif(model_a)
 #
 ```{r}
 # throw one of each of the multicollinear variables out for the final model:
-
+model_b<-lm(visits~idp + log_api + log_max_deductible + 
+    physlim + num_disease + log_income + log_fam_size + schooling + 
+    age + sex + black + condition,
+             data=log_data)
+car::vif(model_b)
 ```
-#
+```{r}
+summary(model_b)
+```
+# Make a prediction with my model
 
 ```{r}
 
 ```
-#
+# Check assumptions
 
 ```{r}
 
 ```
 
+# TRY using lasso: make sure we shrink the number of predictors
+```{r}
+# look at all x's without y's, drop all 1's in the design matrix so can use glmnet
+X<-model.matrix(visits~0+., data=log_data)
+# don't have all the pts, but have all the predictors
+Y<-log_data$visits
+
+Lmodel_visits<-glmnet(x=X, y=Y, alpha=1)
+# not plot:
+plot(Lmodel_visits, label=TRUE, xvar="lambda")
+```
+
 #
+```{r}
+L_visits_glmnet<-cv.glmnet(x=X,y=Y, alpha=1, nfolds=10)
+L_visits_glmnet$lambda.1se
+```
+#
+```{r}
+plot(Lmodel_visits, label=T, xvar="lambda")+abline(v=log(L_visits_glmnet$lambda.1se))
+```
+# Lasso says to keep 5?, 7 and 14
+```{r}
+colnames(X)
+# num_disease
+# black
+```
+
+#
+```{r}
+Lasso_model<-lm(visits~num_disease + black+ physlim,
+             data=log_data)
+summary(Lasso_model)
+```
+# Assumptions with the lasso model
+```{r}
+UDC_pred <- mutate(log_data, predictions=fitted(Lasso_model),
+                        resid=residuals(Lasso_model))
+ggplot(UDC_pred, aes(x=predictions, y=resid)) + 
+  geom_point() +
+  geom_hline(yintercept = 0, color="red")
+```
+
+#
+```{r}
+#QQ plot for normality assumption:
+ggplot(UDC_pred, aes(sample=resid)) +
+  stat_qq() +
+  stat_qq_line()
+```
+
+# Check multicolinearity
+
+```{r}
+car::vif(Lasso_model)
+```
+# Make prediction
+```{r}
+#use predict function for that row=2
+predict(Lasso_model,log_data[2,] )
+
+#residual
+#actual- predicted
+#resid
+
+# actual visits=2, it predicted 1.635084 
+```
+# Look at outliers
+```{r}
+# model with cross val built in
+control<-trainControl(method="CV", number=10)
+final_model_lasso<-train(visits~num_disease + black+ physlim,
+                    method="lm",trControl=control, log_data)
+summary(final_model_lasso)
+```
+
+#
+```{r}
+# cooks distance
+dat_life<-final_model_lasso$finalModel%>%
+  augment(log_data)
+
+
+influence<-filter(dat_life, .cooksd>4/nrow(log_data))
+# these are the values we need to throw out
+influence
+```
+
+#
+```{r}
+# keep only what we want
+
+noninfluence<-filter(dat_life, .cooksd<=4/nrow(log_data))
+noninfluence
+```
 ```{r}
 
 ```
+#
+```{r}
+final_model2<-train(visits~num_disease + black+ physlim,
+                    method="lm",trControl=control, noninfluence)
+summary(final_model2)
+```
+#
+```{r}
+final_model2$results$RMSE
+```
+
+
+# Try lasso with unlogged values
+
+```{r}
+
+
+```
+
+
+
+
+
+
+
+
+
+
+
 
