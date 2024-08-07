@@ -186,3 +186,134 @@ roc_thing
 roc_df<-data.frame(TPR=roc_thing$sensitivities, FPR=1-roc_thing$specificities)
 ggplot(roc_df, aes(x=FPR, y=TPR))+geom_line(color="blue")
 ```
+
+#-----------------------------------------------------------------------
+# TRY USING UNLOGGED DATA:
+# took out x's and health which is condition and then only keep unlogged values
+```{r}
+unlog_data<-everything_data3[,-c(1,2,4,6,7,10, 11,12,23:27)]
+colnames(unlog_data)
+```
+
+#
+# use aic with logit for response as physlim
+
+```{r}
+# build the logit model with everything but hthe response itself
+logit_model_unlog<-glm(physlim~.-physlim, unlog_data, family='binomial')
+summary(logit_model_unlog)
+#looks like some are not helpful predictors
+```
+
+#
+```{r}
+# aic to choose predictors
+aic2<-MASS::stepAIC(logit_model_unlog, direction='both', trace=F)
+summary(aic2)
+# looks like it took out the insignificant ones: age (child also seems insinificant)
+```
+
+#
+# look at multicollinearity and vif of variables that aic kept and without the response
+```{r}
+model_from_aic<-glm(formula = physlim ~ visits + idp + num_disease + schooling + 
+    child + black + insurance + payment + deductible + income + 
+    condition, family = "binomial", data = unlog_data)
+summary(model_from_aic)
+```
+# Check multicollinearity
+```{r}
+car::vif(model_from_aic)
+```
+#
+# NOTE: STILL NEED TO CHECK ASSUMPTIONS (not necessarily that important) 
+```{r}
+long<-gather(unlog_data, key='predictor', value='value', visits, idp, num_disease, schooling,
+    child, black, insurance, payment, deductible, income, 
+    condition)
+ggplot(long, aes(x=value, y=physlim, color=predictor))+geom_point()+
+  facet_wrap(~predictor, scales='free_x')
+```
+
+#
+# Also build ROC curve - look at this for sure
+
+```{r}
+# tenfold cv
+# Ensure the response variable is a factor with two levels
+unlog_data$physlim_words<-everything_data3$physlim
+unlog_data$physlim_words <- factor(unlog_data$physlim_words)
+levels(unlog_data$physlim_words) <- make.names(levels(unlog_data$physlim_words))
+
+ctrl <- trainControl(method = "cv", 
+                     number = 10, 
+                     summaryFunction = twoClassSummary,
+                     classProbs = TRUE, 
+                     savePredictions = TRUE)
+
+logit_model_final2 <- train(physlim_words ~ visits + idp + num_disease + schooling + child + black + insurance + payment + deductible + income + 
+    condition, 
+                            data = unlog_data, 
+                            method = 'glm', 
+                            family = 'binomial', 
+                            trControl = ctrl, 
+                            metric = "ROC")
+# it is same as above but it includes the cross val and roc curve
+summary(logit_model_final2)
+```
+
+#
+
+#
+# get confusion matrix
+
+```{r}
+# but this one has been cross validated
+table(predictions$pred, predictions$obs)
+# picks anything above 50% as win and below is loss for the preditions
+```
+# Accuracy:
+```{r}
+(16493+416)/(16493+416+254+3023)
+
+
+```
+# ROC
+```{r}
+library(pROC)
+roc_thing<-roc(predictions$obs, predictions$X1)
+roc_thing
+```
+#
+```{r}
+# tell it TP rate (sensitivity) and FP rate (1-specificity)
+roc_df<-data.frame(TPR=roc_thing$sensitivities, FPR=1-roc_thing$specificities)
+ggplot(roc_df, aes(x=FPR, y=TPR))+geom_line(color="blue")
+```
+# PREDICTIONS AND EXPONENENTS
+```{r}
+# we used this only with glm
+exp(coef(logit_model_final2$finalModel))
+```
+# interpretation:
+
+For schooling=0.9557047: For every one percentage point increase in schooling, the odds of a physical limitation decrease by (1-0.9557047=0.0442953)= 4.43% holding all other variables fixed. 
+
+For number of diseases=1.0918321: for every one percentage point increase in number of diseases, the odds of a physical limitation increases by (1.0918321-1=0.0918321) 9.18% holding all other variables fixed. 
+
+```{r}
+# create column called predictions
+predictions<-logit_model_final2$pred
+predictions
+```
+I
+# Interpreations:
+For the values in row 1 there is a 89% chance the person has no physlim and a 10.5% chance they do. It also includes a predicted value and an observed value. 
+
+```{r}
+View(unlog_data)
+```
+#
+
+
+#
