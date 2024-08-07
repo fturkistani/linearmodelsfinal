@@ -46,7 +46,7 @@ Alternative hypothesis = At least one of the means is different from the others
 
 ```{r}
 DoctorContacts$health <- factor(DoctorContacts$health, 
-                                levels = c('excellent', 'good', 'fair', 'poor'))
+                                levels = c('poor', 'fair', 'good', 'excellent'))
 ggplot(DoctorContacts, aes(x=health, y=schooling, fill=health)) + geom_boxplot()
 ```
 
@@ -155,3 +155,25 @@ Matches logit_model2, yay!
 car::vif(logit_model2)
 ```
 Low VIF suggests no multicollinearity (also shown by correlation matrix?) Yay!
+
+```{r}
+#visualization of proportion of black folks in dataset
+
+black_count <- sum(DoctorContacts$black)
+non_black_count <- sum(!DoctorContacts$black)
+total_count <- nrow(DoctorContacts)
+
+black_count
+non_black_count
+total_count
+```
+```{r}
+counts <- c(black_count, non_black_count)
+totals <- c(total_count, total_count)
+
+prop.test(counts, totals)
+```
+```{r}
+ggplot(DoctorContacts, aes(x=black, y=visits, fill=black))+geom_boxplot()
+```
+
