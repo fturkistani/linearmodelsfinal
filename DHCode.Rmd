@@ -13,6 +13,7 @@ library(pls)
 ```
 
 ```{r}
+setwd("C:/Users/chris/Documents/UVA/STAT_6021/FP")
 data<-read.csv('DoctorContacts.csv')
 View(data)
 ```
