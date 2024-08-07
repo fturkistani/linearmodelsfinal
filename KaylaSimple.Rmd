@@ -1,0 +1,284 @@
+---
+title: "Number of Diseases vs Coinsurance Linear Model"
+author: "Kayla Lee"
+date: "2024-07-26"
+output: html_document
+---
+
+Question to be explored:
+Does an individual’s number of chronic diseases (NDISEASE) affect their co-insurance rate (unlog of LC)?
+
+Hypotheses with renamed variables:
+Null: An individual’s number of chronic diseases (num_disease) has no effect on their co-insurance rate (coinsurance).
+Alt: An individual’s number of chronic diseases (num_disease) has an effect on their co-insurance rate (coinsurance).
+
+
+Set up
+```{r}
+library(readr)
+library(tidyverse)
+library(ggplot2)
+library(ggcorrplot)
+library(car)
+# library(MASS)   # messes with select function in dplyr
+library(broom)
+library(dplyr)
+library(caret)
+library(glmnet)
+library(pls)
+
+DoctorContacts <- read_csv("DoctorContacts.csv")
+```
+
+Data cleaning
+```{r}
+# Rename columns
+DoctorContacts <- DoctorContacts %>%
+  rename(visits = mdu, log_coinsurance = lc, log_api = lpi,
+         log_max_deductible = fmde, num_disease = ndisease,
+         log_income = linc, log_fam_size = lfam, schooling = educdec)
+
+# Delete extra index column
+DoctorContacts <- select(DoctorContacts, -rownames)
+
+# Undo log transformations
+DoctorContacts$coinsurance = exp(DoctorContacts$log_coinsurance)
+DoctorContacts$payment = exp(DoctorContacts$log_api)
+DoctorContacts$deductible = exp(DoctorContacts$log_max_deductible)
+DoctorContacts$income = exp(DoctorContacts$log_income)
+DoctorContacts$family = exp(DoctorContacts$log_fam_size)
+```
+
+
+Linear model: Number of Chronic Diseases (predictor: num_disease) vs Co-Insurance Rate (response: coinsurance) 
+```{r}
+# Plotting: do num_disease and insurance have a linear relationship?
+ggplot(DoctorContacts, aes(x = num_disease, y = coinsurance)) + 
+  geom_point() + 
+  geom_smooth(method = 'lm', se = F)
+```
+There does not seem to be a linear relationship between the number of chronic diseases and the co-insurance rate.
+
+
+```{r}
+# Creating a residuals column in the data table
+disease_insurance_model <- lm(coinsurance~num_disease, DoctorContacts)
+
+disease_insurance_predictions <- mutate(DoctorContacts, predictions = fitted(disease_insurance_model), 
+                                      residuals = residuals(disease_insurance_model))
+
+# Residuals plot
+ggplot(disease_insurance_predictions, aes(x = predictions, y = residuals)) + 
+  geom_point() + 
+  geom_hline(yintercept = 0, color = 'red')
+```
+The residuals do not seem to have a random distribution. 
+
+
+```{r}
+# QQ plot
+ggplot(disease_insurance_predictions, aes(sample = residuals)) + 
+  stat_qq() + 
+  stat_qq_line(color = 'red')
+```
+The points do not fall on the diagonal, thus the normality assumption seems to fail.
+
+
+```{r}
+# Summary statistics
+summary(disease_insurance_model)
+```
+
+```{r}
+# Finding correlation coefficient between num_disease and coinsurance
+cor_coef <- cor(DoctorContacts$coinsurance, DoctorContacts$num_disease)
+cor_coef
+```
+Based off of the graph of the number of diseases versus the co-insurance rate, there is obviously little to no correlation. Analyzing the correlation coefficient, we see that it is -0.06. A correlation coefficient close to +/- 1 is indicative of a strong positive/negative relationship, respectively. A correlation coefficient close to 0 indicates that there is no linear relationship between the two variables being studied. Since -0.06 is close to 0, we can conclude that there is no relationship between the number of diseases and the co-insurance rate.
+
+
+```{r}
+# Looking at B_0 (y-intercept) and B_1 (slope)
+coef(disease_insurance_model)
+```
+Since B_0 = 44.21 and B_1 = -0.39, rounded to two decimal places, the equation for the line of best fit would be: coinsurance = 44.21 - 0.39*num_disease
+
+```{r}
+# Bootstrapping: finding 10000 bootstrap estimates to estimate B_0 and B_1 alternatively
+bootstrap_estimates <- replicate(1000, {
+ 
+bootstrap_samples <- DoctorContacts[sample(1:nrow(DoctorContacts), nrow(DoctorContacts), replace = T),]
+
+bootstrap_models <- lm(coinsurance~num_disease, bootstrap_samples)
+coef(bootstrap_models)
+})
+
+# Making the bootstrap data tidy 
+estimates <- t(bootstrap_estimates)
+
+# Tidy data df
+estimates_df <- data.frame(estimates)
+
+# Taking the average of the bootstraps to find B_0 and B_1
+summarize(estimates_df, mean_b0 = mean(X.Intercept.), mean_b1 = mean(num_disease))
+```
+With this estimation, which is expected to be more precise, we obtain (rounded to two decimal points) B_0 = 44.19, B_1 = -0.39, and the equation: insurance = 44.19 - 0.39*num_disease. This is actually very close to using the least squares method of parameter estimation for finding B_0 and B_1.
+
+```{r}
+# Plotting bootstrap equation lines to least squares prediction line
+ggplot(DoctorContacts, aes(x = num_disease, y = coinsurance)) + 
+  geom_point() + 
+  geom_smooth(method = 'lm', se = F, color = 'red') +
+  geom_abline(data = estimates_df, aes(intercept = X.Intercept., slope = num_disease), 
+              color = 'lightblue')
+```
+
+Overall, we fail to reject the null. That is, we conclude, based off of the num_disease versus co-insurance plots with the lines of best fit and the correlation coefficient, that an individual’s number of chronic diseases has no effect on their co-insurance rate.
+
+ASIDE: Co-insurance is the ratio the individual pays for the medical bills.
+People with lower co-insurance aren't more or less likely to get sick, they simply have better/greater access to health care (i.e. their insurance covers more of the medical bills). Thus, the number of diseases an individual has should not have an affect on their co-insurance rate, especially since an individual's medical history does not need to be disclosed before signing onto an insurance plan (as in, insurances don't know who has more or less diseases).
+
+
+
+VARIABLE TRANSFORMS ATTEMPTS
+
+LOG TRANSFORM
+```{r}
+# actually using original data (log_coinsurance) because that was already logged
+
+# Plotting: do num_disease and log_coinsurance have a linear relationship?
+ggplot(DoctorContacts, aes(x = num_disease, y = log_coinsurance)) + 
+  geom_point() + 
+  geom_smooth(method = 'lm', se = F)
+```
+There does not seem to be a linear relationship between the number of chronic diseases and the log of the co-insurance rate.
+
+```{r}
+# Creating a residuals column in the data table
+disease_insurance_log_model <- lm(log_coinsurance~num_disease, DoctorContacts)
+
+disease_insurance_log_predictions <- mutate(DoctorContacts, predictions = fitted(disease_insurance_log_model), 
+                                      residuals = residuals(disease_insurance_log_model))
+
+# Residuals plot
+ggplot(disease_insurance_log_predictions, aes(x = predictions, y = residuals)) + 
+  geom_point() + 
+  geom_hline(yintercept = 0, color = 'red')
+```
+The residuals do not seem to have a random distribution. 
+
+```{r}
+# QQ plot
+ggplot(disease_insurance_log_predictions, aes(sample = residuals)) + 
+  stat_qq() + 
+  stat_qq_line(color = 'red')
+```
+The points do not fall on the diagonal, thus the normality assumption seems to fail.
+
+```{r}
+# Summary statistics
+summary(disease_insurance_log_model)
+```
+
+```{r}
+# Finding correlation coefficient between num_disease and log_coinsurance
+cor_coef <- cor(DoctorContacts$log_coinsurance, DoctorContacts$num_disease)
+cor_coef
+```
+Based off of the graph of the number of diseases versus the co-insurance rate, there is obviously little to no correlation. Analyzing the correlation coefficient, we see that it is -0.05. A correlation coefficient close to +/- 1 is indicative of a strong positive/negative relationship, respectively. A correlation coefficient close to 0 indicates that there is no linear relationship between the two variables being studied. Since -0.05 is close to 0, we can conclude that there is no relationship between the number of diseases and the co-insurance rate.
+
+
+
+SQUARE ROOT TRANSFORM
+```{r}
+DoctorContacts$sqrt_coinsurance = sqrt(DoctorContacts$coinsurance)
+
+# Plotting: do num_disease and sqrt_coinsurance have a linear relationship?
+ggplot(DoctorContacts, aes(x = num_disease, y = sqrt_coinsurance)) + 
+  geom_point() + 
+  geom_smooth(method = 'lm', se = F)
+```
+There does not seem to be a linear relationship between the number of chronic diseases and the square roots of the co-insurance rate.
+
+```{r}
+# Creating a residuals column in the data table
+disease_insurance_sqrt_model <- lm(sqrt_coinsurance~num_disease, DoctorContacts)
+
+disease_insurance_sqrt_predictions <- mutate(DoctorContacts, predictions = fitted(disease_insurance_sqrt_model),
+                                             residuals = residuals(disease_insurance_sqrt_model))
+
+# Residuals plot
+ggplot(disease_insurance_sqrt_predictions, aes(x = predictions, y = residuals)) + 
+  geom_point() + 
+  geom_hline(yintercept = 0, color = 'red')
+```
+The residuals do not seem to have a random distribution. 
+
+```{r}
+# QQ plot
+ggplot(disease_insurance_sqrt_predictions, aes(sample = residuals)) + 
+  stat_qq() + 
+  stat_qq_line(color = 'red')
+```
+The points do not fall on the diagonal, thus the normality assumption seems to fail.
+
+```{r}
+# Summary statistics
+summary(disease_insurance_sqrt_model)
+```
+
+```{r}
+# Finding correlation coefficient between num_disease and sqrt_coinsurance
+cor_coef <- cor(DoctorContacts$sqrt_coinsurance, DoctorContacts$num_disease)
+cor_coef
+```
+Based off of the graph of the number of diseases versus the co-insurance rate, there is obviously little to no correlation. Analyzing the correlation coefficient, we see that it is -0.06. A correlation coefficient close to +/- 1 is indicative of a strong positive/negative relationship, respectively. A correlation coefficient close to 0 indicates that there is no linear relationship between the two variables being studied. Since -0.06 is close to 0, we can conclude that there is no relationship between the number of diseases and the co-insurance rate.
+
+
+
+INVERSE TRANSFORM
+```{r}
+DoctorContacts$inv_coinsurance = 1/(DoctorContacts$coinsurance)
+
+# Plotting: do num_disease and inv_coinsurance have a linear relationship?
+ggplot(DoctorContacts, aes(x = num_disease, y = inv_coinsurance)) + 
+  geom_point() + 
+  geom_smooth(method = 'lm', se = F)
+```
+There does not seem to be a linear relationship between the number of chronic diseases and the inverse of the co-insurance rate.
+
+```{r}
+# Creating a residuals column in the data table
+disease_insurance_inv_model <- lm(inv_coinsurance~num_disease, DoctorContacts)
+
+disease_insurance_inv_predictions <- mutate(DoctorContacts, predictions = fitted(disease_insurance_inv_model),
+                                             residuals = residuals(disease_insurance_inv_model))
+
+# Residuals plot
+ggplot(disease_insurance_inv_predictions, aes(x = predictions, y = residuals)) + 
+  geom_point() + 
+  geom_hline(yintercept = 0, color = 'red')
+```
+The residuals do not seem to have a random distribution. 
+
+```{r}
+# QQ plot
+ggplot(disease_insurance_inv_predictions, aes(sample = residuals)) + 
+  stat_qq() + 
+  stat_qq_line(color = 'red')
+```
+The points do not fall on the diagonal, thus the normality assumption seems to fail.
+
+```{r}
+# Summary statistics
+summary(disease_insurance_inv_model)
+```
+
+```{r}
+# Finding correlation coefficient between num_disease and inv_coinsurance
+cor_coef <- cor(DoctorContacts$inv_coinsurance, DoctorContacts$num_disease)
+cor_coef
+```
+Based off of the graph of the number of diseases versus the co-insurance rate, there is obviously little to no correlation. Analyzing the correlation coefficient, we see that it is 0.04. A correlation coefficient close to +/- 1 is indicative of a strong positive/negative relationship, respectively. A correlation coefficient close to 0 indicates that there is no linear relationship between the two variables being studied. Since 0.04 is close to 0, we can conclude that there is no relationship between the number of diseases and the co-insurance rate.
+
+

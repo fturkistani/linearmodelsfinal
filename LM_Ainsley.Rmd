@@ -43,42 +43,239 @@ DoctorContacts$family = exp(DoctorContacts$log_fam_size)
 #
 ```{r}
 #write to a new csv with the updates:
+write.csv(DoctorContacts, file="UpdatedDoctorContacts")
+```
+
+#
+```{r}
+#use the updated data:
+UDC<-read.csv("UpdatedDoctorContacts")
+View(UDC)
+```
+# My Question:
+Are the annual family income (LINC, unlog this), co-insurance rate (LC, unlog this), and number of chronic diseases (NDISEASE) of an individual statistically significant predictors for the number of doctor visits (MDU)?
+Null: None of the predictors among the annual family income (LINC, unlog this), co-insurance rate (LC, unlog this), and number of chronic diseases (NDISEASE) are helpful in predicting the number of doctor visits (MDU).
+Alt: At least one of the predictors among annual family income (LINC, unlog this), co-insurance rate (LC, unlog this), and number of chronic diseases are helpful in predicting the number of doctor visits (MDU).
+
+```{r}
+# check first three assumptions:
+UDC_long<-gather(UDC, key="predictor",value="value", income,insurance, num_disease)
+
+ggplot(UDC_long, aes(x=value, y=visits, color=predictor))+geom_point()+
+  facet_wrap(~predictor,scale="free_x")
+#none of these look particularly linearly related, thus, I will try using the log values of the ones that were log transformed. 
+```
+#
+```{r}
+UDC_long_b<-gather(UDC, key="predictor",value="value", log_income,log_coinsurance, num_disease)
+
+ggplot(UDC_long_b, aes(x=value, y=visits, color=predictor))+geom_point()+
+  facet_wrap(~predictor,scale="free_x")
+#Not sure that looks much better but we will run the assumptions tests
+```
+
+#
+```{r}
+#check first three assumptions with residual plot:
+model_a <- lm(visits~log_income+log_coinsurance+ num_disease,
+             data=UDC)
+coef(model_a)
+
+UDC_pred <- mutate(UDC, predictions=fitted(model_a),
+                        resid=residuals(model_a))
+ggplot(UDC_pred, aes(x=predictions, y=resid)) + 
+  geom_point() +
+  geom_hline(yintercept = 0, color="red")
+#wow not equal amount on both sides of the line, not a random scatter, etc. 
+```
+```{r}
+#QQ plot for normality assumption:
+ggplot(UDC_pred, aes(sample=resid)) +
+  stat_qq() +
+  stat_qq_line()
+#The residuals indicate a significantly skewed right distraibution and violates the normality assumption 
+```
+
+```{r}
+
+```
+#
+```{r}
+summary(model_a)
+#can see based on p-values that the predictors are valuable to the model. 
+```
+
+#
+```{r}
+#check for multicollinearity:
+#correlation matrix: cor from -1 to 1
+cor_mat<-round(cor(UDC[,c("log_income","log_coinsurance", "num_disease","visits")]), 2)
+cor_mat
+#doesn't seem to be multicollinearity
+```
+#Test if the model is useful
+```{r}
+# we can see from the summary that the F value is huge and the p-value is 2.2e-16 which is much smaller than 0.05. So we conclude at least one of the predictors is useful in predicting that the 
+```
+
+# See the VIF values:
+```{r}
+
+library(car)
+vif(model_a)
+# none of the vif values are extreme
+```
+
+# Try Anova Instead with a partial F test to see whether a subset of the variables contribute significantly to predict number of visits
+```{r}
+partial_a<-lm(visits~log_income + log_coinsurance, 
+    data = UDC)
+anova(partial_a,model_a)
+# we can see that income and/or coinsurance do contribute significantly to predict visits
+```
+
+#
+```{r}
+# read in new csv
+dc_update<-read.csv("DrContactsNew.csv")
+View(dc_update)
+# summaries could be boxplots with numbers labeled, summarize in terms of center and spread of most important variables. 
+
+# for my question, look at poisson regression
+```
+# Try model with sqrted transformations:
+```{r}
+model_a <- lm(visits~log_income+log_coinsurance+ num_disease,
+             data=UDC)
+```
+
+
+
+#WORKING ON NEW THINGS
+
+
+```{r}
+
+model_aic<-lm(visits~.-,data=UDC)
+aic<-MASS::stepAIC(model_aic, direction="both",Trace=F)
+summary(aic)
+
+```
+
+# 
+
+
+# USE AIC INSTEAD:
+```{r}
+everything_data<-read.csv("DrContactsNew.csv")
+head(everything_data)
+```
+
+#
+```{r}
+#everything updated
+everything_data2<-everything_data%>%
+  mutate(condition = case_when(
+    health %in% c("poor", "fair") ~ "unhealthy",
+    health %in% c("good", "excellent") ~ "healthy",
+    TRUE ~ as.character(health)
+  ))
+
+#View(everything_data2)
+```
+#
+
+```{r}
+# make all binary zero or 1
+everything_data3<-everything_data2%>%
+  mutate(physlim=ifelse(physlim=="TRUE", 1,0),
+         idp=ifelse(idp=="TRUE", 1,0),
+         sex=ifelse(sex=="male", 1,0),
+         child=ifelse(child=="TRUE", 1,0),
+         black=ifelse(black=="TRUE", 1,0),
+         condition=ifelse(condition=="healthy", 1,0))
+#View(everything_data3)
+```
+#
+```{r}
+#see columns of everything data:
+colnames(everything_data3)  
+```
+
+# subset the data so it it using the log info and updated binary
+```{r}
+# took out x's and health which is condition and all exp and sqrted
+log_data<-everything_data3[,-c(1,2,10,18:27)]
+colnames(log_data)
+```
+```{r}
+
+model_aic<-lm(visits~.-visits,data=log_data)
+aic<-MASS::stepAIC(model_aic, direction="both",Trace=F)
+summary(aic)
+
+```
+
+# note: 
+it kept all predictors
+
+# check assumptions with residual plots
+```{r}
+model_a <- lm(visits~log_coinsurance + idp + log_api + log_max_deductible + 
+    physlim + num_disease + log_income + log_fam_size + schooling + 
+    age + sex + child + black + condition,
+             data=log_data)
+coef(model_a)
+
+UDC_pred <- mutate(log_data, predictions=fitted(model_a),
+                        resid=residuals(model_a))
+ggplot(UDC_pred, aes(x=predictions, y=resid)) + 
+  geom_point() +
+  geom_hline(yintercept = 0, color="red")
+
+# still horrible
+```
+#
+
+```{r}
+#QQ plot for normality assumption:
+ggplot(UDC_pred, aes(sample=resid)) +
+  stat_qq() +
+  stat_qq_line()
+# still horribly skewed right and not normal :)
+```
+# check for multicollinearity with corr and vif
+
+```{r}
+colnames(log_data)
+dat<-log_data[,-1]
+cor_mat<-round(cor(dat),2)
+ggcorrplot::ggcorrplot(cor_mat, lab=T, type='lower')
+```
+log_coninsurance and log_max_deductable are multicollinear as well as age and child
+# now see vif
+```{r}
+car::vif(model_a)
+# we see the same result as the correlation matrix suggests but we are more concerned about coinsurance and deductable than child and age 
+```
+#
+```{r}
+# throw one of each of the multicollinear variables out for the final model:
+
+```
+#
+
+```{r}
+
+```
+#
+
+```{r}
 
 ```
 
 #
 ```{r}
-```
-#
-```{r}
-```
-#
-```{r}
+
 ```
 
-#
-```{r}
-```
-
-#
-```{r}
-```
-
-#
-```{r}
-```
-
-#
-```{r}
-```
-#
-```{r}
-```
-
-#
-```{r}
-```
-
-#
-```{r}
-```

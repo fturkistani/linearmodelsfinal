@@ -1,0 +1,73 @@
+---
+title: "Multilinear Model for Coinsurance Prediction"
+author: "Kayla Lee"
+date: "2024-08-05"
+output: html_document
+---
+
+Set up
+```{r}
+library(readr)
+library(tidyverse)
+library(ggplot2)
+library(ggcorrplot)
+library(car)
+# library(MASS)   # messes with select function in dplyr
+library(broom)
+library(dplyr)
+library(caret)
+library(glmnet)
+library(pls)
+
+DoctorContacts <- read_csv("DoctorContacts.csv")
+
+# Rename columns
+DoctorContacts <- DoctorContacts %>%
+  rename(visits = mdu, log_coinsurance = lc, log_api = lpi,
+         log_max_deductible = fmde, num_disease = ndisease,
+         log_income = linc, log_fam_size = lfam, schooling = educdec)
+
+# Delete extra index column
+DoctorContacts <- select(DoctorContacts, -rownames)
+
+# Undo log transformations
+DoctorContacts$coinsurance = exp(DoctorContacts$log_coinsurance)
+DoctorContacts$payment = exp(DoctorContacts$log_api)
+DoctorContacts$deductible = exp(DoctorContacts$log_max_deductible)
+DoctorContacts$income = exp(DoctorContacts$log_income)
+DoctorContacts$family = exp(DoctorContacts$log_fam_size)
+```
+
+
+AIC MODEL FOR COINSURANCE
+```{r}
+multi_coinsurance_model <- lm(coinsurance~visits+idp+physlim+num_disease+black+payment+deductible+income+family-log_coinsurance-log_api-log_max_deductible-log_income-log_fam_size, DoctorContacts)
+aic <- MASS::stepAIC(multi_coinsurance_model, direction = "both", Trace = F)
+summary(aic)
+```
+
+```{r}
+final_multi_model <- lm(coinsurance~.-log_coinsurance-log_api-log_max_deductible-log_income-log_fam_size, DoctorContacts)
+aic <- MASS::stepAIC(final_multi_model, direction = "both", Trace = F)
+summary(aic)
+```
+
+Despite taking out some additional predictors in the first model, the second multilinear model has slightly higher R^2 and adjusted R^2 values.
+
+```{r}
+coef(final_multi_model)
+```
+
+```{r}
+final_multi_preds <- gather(DoctorContacts, key = "predictor", value = "value", visits, idp, num_disease, 
+                            health, schooling, age, sex, child, black, payment, deductible, income, family)
+
+ggplot(final_multi_preds, aes(x = value, y = coinsurance, color = predictor)) + 
+  geom_point() +
+  facet_wrap(~predictor, scales = "free_x")
+```
+
+Since linearity fails we will not move on with this model.
+
+
+
