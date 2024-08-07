@@ -18,6 +18,9 @@ DoctorContacts <- read.csv("DoctorContacts.csv")
 ```{r}
 # Load packages
 library(tidyverse)
+library(broom)
+library(ISLR2)
+library(glmnet)
 ```
 
 ```{r}
@@ -92,3 +95,137 @@ mean(F_visits$visits)
 ```{r}
 mean(M_visits$visits)
 ```
+#### Boxplot for Kayla ####
+
+```{r}
+DoctorContacts$insurance <- round(DoctorContacts$insurance, 2)
+
+# unique(DoctorContacts$insurance)
+
+ggplot(DoctorContacts, aes(x = as.factor(insurance), y = num_disease, fill = as.factor(insurance))) + 
+  geom_boxplot() +
+  labs(x = "Insurance Rate", y = "Number of Diseases")
+```
+
+#### Devon's code ####
+
+Logistic Regression
+```{r}
+drs<-read.csv('DrContactsNew.csv')
+View(drs)
+```
+
+Transform health column into binary as column 'condition'
+Used log data from original data set for this
+```{r}
+ drs1<- DoctorContacts %>%
+  mutate(condition = case_when(
+    health %in% c("poor", "fair") ~ "unhealthy",
+    health %in% c("good", "excellent") ~ "healthy",
+    TRUE ~ as.character(health)
+  ))
+
+# View(drs1)
+```
+
+Bar graph shows relationship between condition and sex. (Just for fun)
+```{r}
+ggplot(drs1, aes(x=sex, fill=factor(condition), color=factor(condition)))+
+  geom_bar(position='fill')
+```
+
+
+Make all categoricals factors (0,1)
+```{r}
+drs2<-drs1[, -c(1,9)]%>%
+  mutate(physlim=ifelse(physlim=="TRUE", 1,0),
+         idp=ifelse(idp=="TRUE", 1,0),
+         sex=ifelse(sex=="male", 1,0),
+         child=ifelse(child=="TRUE", 1,0),
+         black=ifelse(black=="TRUE", 1,0),
+         condition=ifelse(condition=="healthy", 1,0))
+# View(drs2)
+```
+
+Remove response/unneeded variables, make correlation matrix
+```{r}
+dat<-drs2[, -15]
+cor_mat<-round(cor(dat),2)
+ggcorrplot::ggcorrplot(cor_mat, lab=T, type='lower')
+```
+There is multicollinearity between age and child (to be expected) and
+log_max_deductible and log_coinsurance (also to be expected). I will remove
+log_max_deductible and child.
+
+```{r}
+dat2<-dat[, -c(5,13)]
+cor_mat2<-round(cor(dat2),2)
+ggcorrplot::ggcorrplot(cor_mat2, lab=T, type='lower')
+```
+
+```{r}
+drs3<-drs2[, -c(5,13)]
+```
+
+Create logistic regression model using glm
+```{r}
+logit_model1<-glm(condition~., drs3, family='binomial')
+summary(logit_model1)
+```
+It looks like family size, coinsurance, idp, and sex are not signficant,
+so I will remove them in the next iteration.
+
+```{r}
+logit_model2<-glm(condition~.-idp-log_coinsurance-log_fam_size-sex, drs3, family='binomial')
+summary(logit_model2)
+```
+Yay! Check with AIC
+```{r}
+aic<-MASS::stepAIC(logit_model1, direction='both', trace=F)
+summary(aic)
+```
+Matches logit_model2, yay!
+
+```{r}
+car::vif(logit_model2)
+```
+Low VIF suggests no multicollinearity (also shown by correlation matrix?) Yay!
+
+```{r}
+# Not sure why AIC for logit_model2 is higher than logit_model1
+# using summary() to identify statistically significant predictors is called the Wald test.
+
+# Trying LASSO 
+
+x <- model.matrix(condition ~ .-condition, drs3)[,-1]
+y <- drs3$condition
+
+# Fit the model
+lasso_model <- cv.glmnet(x, y, family = "binomial", alpha = 1)
+
+# Extract coefficients
+coef(lasso_model, s = "lambda.min")
+# This shrank log_coinsurance to zero
+```
+
+```{r}
+# Predicted probability of healthy self-rating (1 = healthy, 0 = unhealthy)
+
+# Something to consider in limitations: how come people can have 4.3 or 1.5 diseases?
+
+# Remove physlim
+
+# predict(logit_model2, data.frame(visits = 2, physlim = 0, num_disease = 4, log_income = 10, schooling = 12, age = 35,
+# black = 0, payment = 226, deductible = 2120, income = 2500,
+# family = 8), 
+#         type="response")
+```
+
+
+
+
+
+
+
+
+
