@@ -1,0 +1,106 @@
+---
+title: "Farah MLR"
+output: html_document
+date: "2024-08-07"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(warning = FALSE, message = FALSE) 
+```
+
+
+```{r}
+library(readr)
+library(tidyverse)
+library(ggplot2)
+library(ggcorrplot)
+library(car)
+# library(MASS)   # messes with select function in dplyr
+library(broom)
+library(dplyr)
+library(caret)
+library(glmnet)
+library(pls)
+```
+
+```{r}
+# Read in data
+DoctorContacts <- read.csv("UpdatedDoctorContacts.csv")
+head(DoctorContacts)
+```
+
+************************************************THE QUESTION***********************************************
+(Multilinear Model): 
+Does the household head’s years of schooling (schooling), family income (income), family size (family),  statistically significant predictors of deductible rate (deductible).
+Null: None of the predictors among the household head’s years of schooling (schooling), family income (income), and family size (family) are helpful in predicting deductible rate (deductible).
+Alt: At least one of the predictors among the household head’s years of schooling (schooling), family income (income), and family size (family) are helpful in predicting deductible rate (deductible).
+
+create a model:
+
+predictors: 
+  schooling (NUM)
+  log_fam_size (NUM)
+  log_coinsurance (NUM)
+  log_income (NUM)
+  physlim (CAT)
+  
+response:
+  deductible (NUM)
+
+```{r}
+modeldeductible <- lm(deductible~schooling+log_fam_size+log_coinsurance+log_income+physlim, data=DoctorContacts)
+summary(modeldeductible)
+```
+
+
+
+```{r}
+aic <- MASS::stepAIC(modeldeductible, direction = "both", Trace = F)
+summary(aic)
+```
+
+```{r}
+coef(modeldeductible)
+```
+
+```{r}
+colnames(DoctorContacts)
+```
+
+
+```{r}
+preds <- gather(DoctorContacts, key = "predictor", value = "value", schooling,log_fam_size,log_coinsurance,log_income,physlim)
+
+ggplot(preds, aes(x = value, y = deductible, color = predictor)) + geom_point() +
+  facet_wrap(~predictor, scales = "free_x")
+```
+
+```{r}
+exp_pred1 <- mutate(DoctorContacts, predictions=fitted(model0), residual=residuals(model0))
+exp_pred1 <- log_pred[-c(1:2, 4:6, 8:9, 12:18, 20:21)]
+head(exp_pred1)
+```
+
+
+```{r}
+ggplot(exp_pred1, aes(x=predictions, y=residual))+geom_point()+
+  geom_hline(yintercept=0, color='red')
+```
+
+```{r}
+ggplot(exp_pred1, aes(sample=residual))+stat_qq() +stat_qq_line()
+```
+```{r}
+df_for_cor <- exp_pred1[,c(-6, -7)]
+cor_mat<-round(cor(df_for_cor), 2)
+cor_mat
+```
+```{r}
+library(ggcorrplot)
+ggcorrplot(cor_mat, lab=T, type='lower')
+```
+```{r}
+vif(modeldeductible)
+
+```
+
