@@ -1,0 +1,61 @@
+---
+title: "subset on black and income"
+output: html_document
+date: "2024-08-07"
+---
+
+```{r}
+library(readr)
+library(tidyverse)
+library(ggplot2)
+library(ggcorrplot)
+library(car)
+# library(MASS)   # messes with select function in dplyr
+library(broom)
+library(dplyr)
+library(caret)
+library(glmnet)
+library(pls)
+```
+
+```{r}
+# Read in data
+DoctorContacts <- read.csv("UpdatedDoctorContacts.csv")
+head(DoctorContacts)
+```
+
+
+
+
+```{r}
+black_household <- DoctorContacts[DoctorContacts$black == TRUE, ]
+black_household
+```
+```{r}
+summary(black_household$income)
+```
+
+
+```{r}
+bh_data_min_to_1st <- subset(black_household, income >= 1 & income < 2461)
+bh_data_1st_to_median <- subset(black_household, income >= 2461 & income < 5776)
+bh_data_median_to_3rd <- subset(black_household, income >= 5776 & income < 7227)
+bh_data_3rd_to_max <- subset(black_household, income >= 7227 & income <= 24179)
+```
+
+```{r}
+notblack_household <- DoctorContacts[DoctorContacts$black == FALSE, ]
+notblack_household
+```
+```{r}
+summary(notblack_household$income)
+```
+
+
+```{r}
+nbh_data_min_to_1st <- subset(black_household, income >= 1 & income < 6074)
+nbh_data_1st_to_median <- subset(black_household, income >= 6074 & income < 8623)
+nbh_data_median_to_3rd <- subset(black_household, income >= 8623 & income < 10904)
+nbh_data_3rd_to_max <- subset(black_household, income >= 10904 & income <= 29238)
+```
+

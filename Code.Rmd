@@ -6,12 +6,10 @@ output: html_document
 ---
 
 ```{r}
-<<<<<<< HEAD
 library(tidyverse)
 
 data<-read.csv('DoctorContacts.csv')
 
-=======
 library(readr)
 library(tidyverse)
 ```
@@ -46,9 +44,5 @@ updatedr$sqrt_deductible = sqrt(updatedr$deductible)
 updatedr$sqrt_income = sqrt(updatedr$income)
 updatedr$sqrt_family = sqrt(updatedr$family)
 View(updatedr)
-```
-
-```{r}
-write.csv(updatedr, file="DrContactsNew.csv")
 ```
 

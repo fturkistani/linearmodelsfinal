@@ -11,7 +11,7 @@ knitr::opts_chunk$set(warning = FALSE, message = FALSE)
 
 ```{r}
 # Read in data
-setwd("C:/Users/chris/Documents/UVA/STAT_6021/FP")
+setwd("C:/Users/chris/OneDrive/Desktop/School/linearmodelsfinal")
 DoctorContacts <- read.csv("DoctorContacts.csv")
 ```
 
@@ -109,10 +109,26 @@ ggplot(DoctorContacts, aes(x = as.factor(insurance), y = num_disease, fill = as.
 
 #### Devon's code ####
 
-Logistic Regression
 ```{r}
-drs<-read.csv('DrContactsNew.csv')
-View(drs)
+setwd("C:/Users/chris/OneDrive/Desktop/School/linearmodelsfinal")
+data<-read.csv('DoctorContacts.csv')
+# View(data)
+```
+
+```{r}
+DoctorContacts <- data %>%
+  rename(visits = mdu, log_coinsurance = lc, log_api = lpi,
+         log_max_deductible = fmde, num_disease = ndisease,
+         log_income = linc, log_fam_size = lfam, schooling= educdec)
+```
+
+```{r}
+DoctorContacts$insurance = exp(DoctorContacts$log_coinsurance)
+DoctorContacts$payment = exp(DoctorContacts$log_api)
+DoctorContacts$deductible = exp(DoctorContacts$log_max_deductible)
+DoctorContacts$income = exp(DoctorContacts$log_income)
+DoctorContacts$family = exp(DoctorContacts$log_fam_size)
+# View(DoctorContacts)
 ```
 
 Transform health column into binary as column 'condition'
@@ -137,7 +153,7 @@ ggplot(drs1, aes(x=sex, fill=factor(condition), color=factor(condition)))+
 
 Make all categoricals factors (0,1)
 ```{r}
-drs2<-drs1[, -c(1,9)]%>%
+drs2<-drs1 %>%
   mutate(physlim=ifelse(physlim=="TRUE", 1,0),
          idp=ifelse(idp=="TRUE", 1,0),
          sex=ifelse(sex=="male", 1,0),
@@ -176,7 +192,11 @@ It looks like family size, coinsurance, idp, and sex are not signficant,
 so I will remove them in the next iteration.
 
 ```{r}
-logit_model2<-glm(condition~.-idp-log_coinsurance-log_fam_size-sex, drs3, family='binomial')
+drs4 <- drs3[ ,-c(2:4,8,11,13)]
+```
+
+```{r}
+logit_model2<-glm(condition~., drs4, family='binomial')
 summary(logit_model2)
 ```
 Yay! Check with AIC
@@ -188,6 +208,7 @@ Matches logit_model2, yay!
 
 ```{r}
 car::vif(logit_model2)
+# Seeing multicollinearity between log fam size and family, which makes sense.
 ```
 Low VIF suggests no multicollinearity (also shown by correlation matrix?) Yay!
 
@@ -213,19 +234,133 @@ coef(lasso_model, s = "lambda.min")
 
 # Something to consider in limitations: how come people can have 4.3 or 1.5 diseases?
 
-# Remove physlim
+predict(logit_model2, data.frame(visits = 2, physlim = 0, num_disease = 4, log_income = 10, schooling = 12, age = 35,
+black = 0, payment = 226, deductible = 2120, income = 2500,
+family = 8),
+        type="response")
+```
+```{r}
+prediction<-mutate(drs4, prob=predict(logit_model2, type="response"),odds=log(prob/(1-prob)),classify=ifelse(prob>.5,1,0))
 
-# predict(logit_model2, data.frame(visits = 2, physlim = 0, num_disease = 4, log_income = 10, schooling = 12, age = 35,
-# black = 0, payment = 226, deductible = 2120, income = 2500,
-# family = 8), 
-#         type="response")
+table(prediction$classify,drs4$condition)
+```
+```{r}
+
 ```
 
+```{r}
 
+```
 
+```{r}
 
+```
 
+#### Starting over again: take 2 ####
 
+```{r}
+# Read in data
+setwd("C:/Users/chris/OneDrive/Desktop/School/linearmodelsfinal")
+DoctorContacts <- read.csv("DoctorContacts.csv")
+```
 
+```{r}
+# Load packages
+library(tidyverse)
+library(broom)
+library(ISLR2)
+library(glmnet)
+```
 
+```{r}
+# Rename columns
+DoctorContacts <- DoctorContacts %>%
+  rename(visits = mdu, log_coinsurance = lc, log_api = lpi,
+         log_max_deductible = fmde, num_disease = ndisease,
+         log_income = linc, log_fam_size = lfam, schooling= educdec)
+```
 
+```{r}
+# Delete extra index column
+DoctorContacts <- select(DoctorContacts, -rownames) 
+```
+
+```{r}
+# Undo log transformations
+DoctorContacts$insurance = exp(DoctorContacts$log_coinsurance)
+DoctorContacts$payment = exp(DoctorContacts$log_api)
+DoctorContacts$deductible = exp(DoctorContacts$log_max_deductible)
+DoctorContacts$income = exp(DoctorContacts$log_income)
+DoctorContacts$family = exp(DoctorContacts$log_fam_size)
+```
+
+```{r}
+ drs1<- DoctorContacts %>%
+  mutate(condition = case_when(
+    health %in% c("poor", "fair") ~ "unhealthy",
+    health %in% c("good", "excellent") ~ "healthy",
+    TRUE ~ as.character(health)
+  ))
+
+# View(drs1)
+```
+
+```{r}
+drs2<-drs1 %>%
+  mutate(physlim=ifelse(physlim=="TRUE", 1,0),
+         idp=ifelse(idp=="TRUE", 1,0),
+         sex=ifelse(sex=="male", 1,0),
+         child=ifelse(child=="TRUE", 1,0),
+         black=ifelse(black=="TRUE", 1,0),
+         condition=ifelse(condition=="healthy", 1,0))
+# View(drs2)
+```
+
+```{r}
+# Remove log values and health column
+drs3 <- drs2[ ,-c(2,4:5,8:10)]
+```
+
+```{r}
+# Create model
+logit1 <- glm(condition~., drs3, family='binomial')
+summary(logit1)
+```
+
+```{r}
+# Remove idp, sex, and family
+drs4 <- drs3[ , -c(2,7,14)]
+
+# 2nd logit model
+logit2 <- glm(condition~., drs4, family='binomial')
+summary(logit2)
+```
+
+```{r}
+predict(logit2, data.frame(visits = 2, physlim = 0, num_disease = 4, schooling = 12,
+                           age = 35, black = 0, payment = 226, deductible = 2120,
+                           income = 2500, child = 0, insurance = 95),
+                           type="response")
+
+```
+
+```{r}
+predicted_probs <- predict(logit2, type = "response")
+predicted_classes <- ifelse(predicted_probs > 0.5, 1, 0)
+confusion_matrix <- table(Predicted = predicted_classes, Actual = drs4$condition)
+confusion_matrix
+```
+
+```{r}
+TP <- confusion_matrix[2, 2]
+TN <- confusion_matrix[1, 1]
+FP <- confusion_matrix[2, 1]
+FN <- confusion_matrix[1, 2]
+
+accuracy <- (TP + TN) / (TP + TN + FP + FN) # [1] 0.9144457
+TPR <- TP / (TP + FN)  # Sensitivity, 0.9908317
+TNR <- TN / (TN + FP)  # Specificity 0.1627282
+FPR <- FP / (FP + TN) # 0.8372718
+FNR <- FN / (FN + TP) # 0.009168304
+# High false positive rate but also high true positive rate
+```

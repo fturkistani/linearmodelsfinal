@@ -71,3 +71,148 @@ Since linearity fails we will not move on with this model.
 
 
 
+
+
+
+
+ATTEMPT 2 AT MULTILINEAR MODEL PREDICTING COINSURANCE
+------------------------------- MODELS -----------------------------------------
+```{r}
+# Data
+multidata <- read.csv("DrContactsNew.csv")
+multidata_clean <- select(multidata, -c(X.1, X, log_coinsurance, sqrt_insurance))
+
+# First model: comparing coinsurance to everything
+multi_coinsurance_model1 <- lm(insurance~., multidata_clean)
+summary(multi_coinsurance_model1)
+```
+
+```{r}
+# Second model: hand-selecting the p-values that are significant
+multi_coinsurance_model2 <- lm(insurance~.-idp-log_api-health-log_fam_size-schooling-sex-child-black-family-log_max_deductible-log_income-sqrt_payment-sqrt_deductible-sqrt_income-sqrt_family, multidata_clean)
+summary(multi_coinsurance_model2)
+```
+
+```{r}
+# Third model: hand-selecting the p-values that are significant (another attempt)
+multi_coinsurance_model3 <- lm(insurance~.-physlim-sex-log_api-health-log_fam_size-schooling-age-child-black-log_max_deductible-log_income-sqrt_payment-sqrt_deductible-sqrt_income-sqrt_family-family, multidata_clean)
+
+summary(multi_coinsurance_model3)
+```
+
+
+
+------------------------ CHECKING MODEL ASSUMPTIONS ----------------------------
+WE ARE GOING WITH multi_coinsurance_model3
+```{r}
+# Checking linearity
+multi_coinsurance_preds <- gather(multidata_clean, key = "predictor", value = "value", 
+                                  visits, idp, num_disease, payment, deductible, income)
+
+ggplot(multi_coinsurance_preds, aes(x = value, y = insurance, color = predictor)) + 
+  geom_point() +
+  facet_wrap(~predictor, scales = "free_x")
+```
+There does not appear to be any linearity.
+
+```{r}
+# Creating a residuals column
+multi_coinsurance_model3 <- lm(insurance~.-physlim-sex-log_api-health-log_fam_size-schooling-age-child-black-log_max_deductible-log_income-sqrt_payment-sqrt_deductible-sqrt_income-sqrt_family-family, multidata_clean)
+
+coinsurance_multi_predictions <- mutate(multidata_clean, predictions = fitted(multi_coinsurance_model3), 
+                                        residuals = residuals(multi_coinsurance_model3))
+
+
+# Plotting residuals
+ggplot(coinsurance_multi_predictions, aes(x = predictions, y = residuals)) + 
+  geom_point() + 
+  geom_hline(yintercept = 0, color = 'red')
+```
+The residuals are not randomly distributed, but there is relatively even amount of points above and below the line.
+
+```{r}
+# Checking residual normality
+ggplot(coinsurance_multi_predictions, aes(sample = residuals)) + 
+  stat_qq() + 
+  stat_qq_line(color = 'red')
+```
+Points fall very close to the line, looks okay.
+
+
+
+----------------------- CHECKING FOR MULTICOLLINEARITY  ------------------------
+```{r}
+# Creating a correlation matrix to check for multicollinearity
+multidata_clean_edited <- select(multidata_clean, -c(log_api, log_max_deductible, physlim, health, log_income,
+                                                     log_fam_size, schooling, age, sex, child, black, 
+                                                     sqrt_payment, sqrt_deductible, sqrt_income, sqrt_family, family))
+
+
+cor_matrix <- round(cor(multidata_clean_edited), 2)
+cor_matrix
+```
+
+```{r}
+# Plotting the correlation matrix to check for multicollinearity
+ggcorrplot(cor_matrix, lab = TRUE, type = "lower")
+```
+
+```{r}
+# Looking at VIF to check for multicollinearity
+vif(multi_coinsurance_model3)
+```
+
+
+
+--------------- LOOKING AT INDIVIDUAL PREDICTORS VS COINSURANCE  ---------------
+```{r}
+# Individual predictors' impacts on response (coinsurance)
+avPlots(multi_coinsurance_model3)
+```
+
+
+
+---------------------------- MAKING PREDICTIONS --------------------------------
+```{r}
+# Data for predictions
+final_multi_coinsurance <- lm(insurance~., multidata_clean_edited)
+pred_data <- multidata_clean_edited[1:2,-4]
+
+# Prediction interval
+predict(final_multi_coinsurance, newdata = pred_data, interval = "prediction", level = 0.95)
+```
+
+```{r}
+# Confidence interval
+predict(final_multi_coinsurance, newdata = pred_data, interval = "confidence", level = 0.95)
+```
+
+
+
+----------------------- RIDGE AND LASSO REGRESSIONS  ---------------------------
+```{r}
+# Ridge regression
+design <- model.matrix(insurance~0+., data = multidata_clean)
+response <- multidata_clean$insurance
+rmodel <- glmnet(x = design, y = response, alpha = 0)
+kcvglmnet <- cv.glmnet(x = design, y = response, alpha = 0, nfolds = 3)
+
+plot(rmodel, label = T, xvar = "lambda") +
+  abline(v = log(kcvglmnet$lambda.1se))
+```
+
+```{r}
+# Lasso regression
+design <- model.matrix(insurance~0+., data = multidata_clean)
+response <- multidata_clean$insurance
+lmodel <- glmnet(x = design, y = response, alpha = 1)
+kcvglmnet <- cv.glmnet(x = design, y = response, alpha = 1, nfolds = 3)
+
+plot(lmodel, label = T, xvar = "lambda") +
+  abline(v = log(kcvglmnet$lambda.1se))
+```
+
+```{r}
+design
+```
+

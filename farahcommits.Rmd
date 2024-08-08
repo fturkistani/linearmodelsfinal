@@ -44,22 +44,42 @@ ggplot(DoctorContacts, aes(x=health, y=num_disease, fill=health)) + geom_boxplot
 labs(x = "Self-Rated Health", y = "Number of Chronic Diseases")
 ```
 
+
+```{r}
+summary(DoctorContacts$income)
+```
+
+```{r}
+black_household <- DoctorContacts[DoctorContacts$black == TRUE, ]
+black_household
+```
+```{r}
+summary(black_household$income)
+```
+
+```{r}
+notblack_household <- DoctorContacts[DoctorContacts$black == FALSE, ]
+notblack_household
+```
+```{r}
+summary(notblack_household$income)
+```
+
+```{r}
+sd(DoctorContacts$income)
+```
+
+
+```{r}
+ggplot(DoctorContacts, aes(x=physlim, y=deductible, fill=physlim)) + geom_boxplot() +
+labs(x = "Physical Limitation", y = "Deductible Amount")
+```
+
+
 ```{r}
 colnames(DoctorContacts)
 ```
 
-
-(Multilinear Model): 
-Does the household head’s years of schooling (schooling), family income (income), family size (family),  statistically significant predictors of deductible rate (deductible).
-Null: None of the predictors among the household head’s years of schooling (schooling), family income (income), and family size (family) are helpful in predicting deductible rate (deductible).
-Alt: At least one of the predictors among the household head’s years of schooling (schooling), family income (income), and family size (family) are helpful in predicting deductible rate (deductible).
-
-create a model:
-
-```{r}
-model0 <- lm(deductible~schooling+log_fam_size+log_coinsurance+log_income+physlim, data=DoctorContacts)
-summary(model0)
-```
 
 ```{r}
 aic<-stepAIC(model0, direction='both')

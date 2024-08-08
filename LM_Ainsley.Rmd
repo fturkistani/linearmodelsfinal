@@ -53,6 +53,7 @@ UDC<-read.csv("UpdatedDoctorContacts")
 View(UDC)
 ```
 # My Question:
+# IGNORE STARTING HERE= THIS IS OLD WORK------------------------------------
 Are the annual family income (LINC, unlog this), co-insurance rate (LC, unlog this), and number of chronic diseases (NDISEASE) of an individual statistically significant predictors for the number of doctor visits (MDU)?
 Null: None of the predictors among the annual family income (LINC, unlog this), co-insurance rate (LC, unlog this), and number of chronic diseases (NDISEASE) are helpful in predicting the number of doctor visits (MDU).
 Alt: At least one of the predictors among annual family income (LINC, unlog this), co-insurance rate (LC, unlog this), and number of chronic diseases are helpful in predicting the number of doctor visits (MDU).
@@ -133,8 +134,10 @@ partial_a<-lm(visits~log_income + log_coinsurance,
 anova(partial_a,model_a)
 # we can see that income and/or coinsurance do contribute significantly to predict visits
 ```
+# END OF IGNORE---------------------------------------------------------------
 
-#
+
+# HERE I TRIED USING AIC INSTEAD TO BUILD THE MODEL---------------------------
 ```{r}
 # read in new csv
 dc_update<-read.csv("DrContactsNew.csv")
@@ -202,7 +205,7 @@ everything_data3<-everything_data2%>%
 colnames(everything_data3)  
 ```
 
-# subset the data so it it using the log info and updated binary
+# subset the data so it it using the LOG info and updated binary
 ```{r}
 # took out x's and health which is condition and all exp and sqrted
 log_data<-everything_data3[,-c(1,2,10,18:27)]
@@ -261,21 +264,263 @@ car::vif(model_a)
 #
 ```{r}
 # throw one of each of the multicollinear variables out for the final model:
-
+model_b<-lm(visits~idp + log_api + log_max_deductible + 
+    physlim + num_disease + log_income + log_fam_size + schooling + 
+    age + sex + black + condition,
+             data=log_data)
+car::vif(model_b)
 ```
-#
+```{r}
+summary(model_b)
+```
+# Make a prediction with my model
 
 ```{r}
 
 ```
-#
+# Check assumptions
 
 ```{r}
 
+```
+
+
+
+# TRY USING LASSO WITH LOG DATA------------------------------------------------
+
+# TRY using lasso: make sure we shrink the number of predictors
+```{r}
+# look at all x's without y's, drop all 1's in the design matrix so can use glmnet
+X<-model.matrix(visits~0+., data=log_data)
+# don't have all the pts, but have all the predictors
+Y<-log_data$visits
+
+Lmodel_visits<-glmnet(x=X, y=Y, alpha=1)
+# not plot:
+plot(Lmodel_visits, label=TRUE, xvar="lambda")
+```
+
+#
+```{r}
+L_visits_glmnet<-cv.glmnet(x=X,y=Y, alpha=1, nfolds=10)
+L_visits_glmnet$lambda.1se
+```
+#
+```{r}
+plot(Lmodel_visits, label=T, xvar="lambda")+abline(v=log(L_visits_glmnet$lambda.1se))
+```
+# Lasso says to keep 5?, 7 and 14
+```{r}
+colnames(X)
+# num_disease
+# black
+```
+
+#
+```{r}
+Lasso_model<-lm(visits~num_disease + black+ physlim,
+             data=log_data)
+summary(Lasso_model)
+```
+# Assumptions with the lasso model
+```{r}
+UDC_pred <- mutate(log_data, predictions=fitted(Lasso_model),
+                        resid=residuals(Lasso_model))
+ggplot(UDC_pred, aes(x=predictions, y=resid)) + 
+  geom_point() +
+  geom_hline(yintercept = 0, color="red")
+```
+
+#
+```{r}
+#QQ plot for normality assumption:
+ggplot(UDC_pred, aes(sample=resid)) +
+  stat_qq() +
+  stat_qq_line()
+```
+
+# Check multicolinearity
+
+```{r}
+car::vif(Lasso_model)
+```
+# Make prediction
+```{r}
+#use predict function for that row=2
+predict(Lasso_model,log_data[2,] )
+
+#residual
+#actual- predicted
+#resid
+
+# actual visits=2, it predicted 1.635084 
+```
+
+# TRIED THROWING OUT OUTLIERS AND TRYING AGAIN-FAILED------------------------
+# Look at outliers
+```{r}
+# model with cross val built in
+control<-trainControl(method="CV", number=10)
+final_model_lasso<-train(visits~num_disease + black+ physlim,
+                    method="lm",trControl=control, log_data)
+summary(final_model_lasso)
+```
+
+#
+```{r}
+# cooks distance
+dat_life<-final_model_lasso$finalModel%>%
+  augment(log_data)
+
+
+influence<-filter(dat_life, .cooksd>4/nrow(log_data))
+# these are the values we need to throw out
+influence
+```
+
+#
+```{r}
+# keep only what we want
+
+noninfluence<-filter(dat_life, .cooksd<=4/nrow(log_data))
+noninfluence
+```
+```{r}
+
+```
+#
+```{r}
+final_model2<-train(visits~num_disease + black+ physlim,
+                    method="lm",trControl=control, noninfluence)
+summary(final_model2)
+```
+#
+```{r}
+final_model2$results$RMSE
+```
+
+
+
+## TRY LASSO WITH UNLOGGED VALUES----------------------------------------------
+
+# Try lasso with unlogged values
+
+```{r}
+#see columns of everything data:
+colnames(everything_data3)  
+```
+# MLR USING UNLOGGED
+# subset the data so it it using the log info and updated binary
+```{r}
+# took out x's and health which is condition and then only keep unlogged values
+unlog_data<-everything_data3[,-c(1,2,4,6,7,10, 11,12,23:27)]
+colnames(unlog_data)
+```
+#
+```{r}
+# look at all x's without y's, drop all 1's in the design matrix so can use glmnet
+X<-model.matrix(visits~0+., data=unlog_data)
+# don't have all the pts, but have all the predictors
+Y<-log_data$visits
+
+Lmodel_visits2<-glmnet(x=X, y=Y, alpha=1)
+# not plot:
+plot(Lmodel_visits2, label=TRUE, xvar="lambda")
+```
+
+```{r}
+L_visits_glmnet2<-cv.glmnet(x=X,y=Y, alpha=1, nfolds=10)
+L_visits_glmnet2$lambda.1se
+```
+#
+```{r}
+plot(Lmodel_visits2, label=T, xvar="lambda")+abline(v=log(L_visits_glmnet2$lambda.1se))
+```
+#
+```{r}
+colnames(X)
+
+```
+
+# It says to keep 2 and 8 which is physlim and black
+```{r}
+Lasso_model2<-lm(visits~physlim + black,
+             data=unlog_data)
+summary(Lasso_model2)
+```
+## Assumptions with the lasso model
+```{r}
+UDC_pred2 <- mutate(unlog_data, predictions=fitted(Lasso_model2),
+                        resid=residuals(Lasso_model))
+ggplot(UDC_pred2, aes(x=predictions, y=resid)) + 
+  geom_point() +
+  geom_hline(yintercept = 0, color="red")
+```
+
+#
+```{r}
+#QQ plot for normality assumption:
+ggplot(UDC_pred2, aes(sample=resid)) +
+  stat_qq() +
+  stat_qq_line()
+```
+# Check multicolinearity
+
+```{r}
+car::vif(Lasso_model2)
+```
+# Make prediction
+```{r}
+#use predict function for that row2=2, and row 78 which is 6
+predict(Lasso_model2,unlog_data[c(2,78),] )
+```
+
+```{r}
+View(unlog_data)
 ```
 
 #
 ```{r}
 
 ```
+#
+```{r}
+
+```
+#
+```{r}
+
+```
+#
+```{r}
+
+```
+#
+```{r}
+
+```
+#
+```{r}
+
+```
+#
+```{r}
+
+```
+#
+```{r}
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
 
