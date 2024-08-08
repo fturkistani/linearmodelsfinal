@@ -236,7 +236,6 @@ ggplot(long, aes(x=value, y=physlim, color=predictor))+geom_point()+
 ```
 
 #
-# Also build ROC curve - look at this for sure
 
 ```{r}
 # tenfold cv
@@ -263,8 +262,32 @@ summary(logit_model_final2)
 ```
 
 #
+```{r}
+# add a column that will give prob of win for each row
+unlog_data2<-mutate(unlog_data, prob=predict(logit_model_final2$finalModel, type="response"), log_odds=log(prob/(1-prob)))
 
+ggplot(unlog_data2, aes(x=visits, y=log_odds))+geom_point()# could do jitter
+# have to make a similar plot for all the predictors can do a facet wrap
+# see it is linearly related
+# stuck with categorical predictors, it won't be linear
+# Also build ROC curve - look at this for sure
+```
 #
+```{r}
+# Reshape the data frame to long format
+unlog_data_long <- unlog_data2 %>%
+  pivot_longer(cols = c(visits, idp, num_disease, schooling, child, black, insurance, payment, deductible, income, condition), 
+               names_to = "predictor", 
+               values_to = "value")
+
+# Create the facet wrap plot
+ggplot(unlog_data_long, aes(x = value, y = log_odds)) +
+  geom_point() + 
+  facet_wrap(~ predictor, scales = "free_x") +
+  labs(x = "Predictor Value", y = "Log Odds") +
+  theme_minimal()
+```
+
 # get confusion matrix
 
 ```{r}
