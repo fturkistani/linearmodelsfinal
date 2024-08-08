@@ -72,6 +72,14 @@ ggplot(preds, aes(x = value, y = deductible, color = predictor)) + geom_point() 
 ```
 
 ```{r}
+predslasso <- gather(DoctorContacts, key = "predictor", value = "value", schooling,log_fam_size,log_coinsurance,log_income,physlim)
+
+ggplot(predslasso, aes(x = value, y = deductible, color = predictor)) + geom_point() +
+  facet_wrap(~predictor, scales = "free_x")
+```
+
+
+```{r}
 exp_pred1 <- mutate(DoctorContacts, predictions=fitted(model0), residual=residuals(model0))
 exp_pred1 <- log_pred[-c(1:2, 4:6, 8:9, 12:18, 20:21)]
 head(exp_pred1)
@@ -182,10 +190,40 @@ DoctorContacts
 
 log_coinsurance,idp,physlim, income
 
+
+
 ```{r}
 lassomodel <- lm(deductible~log_coinsurance+idp+physlim+income, DoctorContacts)
 summary(lassomodel)
 ```
+```{r}
+coef(lassomodel)
+```
+
+```{r}
+DoctorContacts[81:82,]
+```
+
+```{r}
+exp(3.258096)
+```
+```{r}
+exp(8.934221)
+```
+
+
+```{r}
+lassomodel <- train(deductible~log_coinsurance+idp+physlim+income, method='lm', DoctorContacts)
+summary(lassomodel)
+```
+
+```{r}
+lassomodel$results$RMSE
+```
+```{r}
+summary(DoctorContacts$deductible)
+```
+
 
 
 ```{r}
