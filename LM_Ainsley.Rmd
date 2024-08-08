@@ -150,6 +150,7 @@ View(dc_update)
 ```{r}
 model_a <- lm(visits~log_income+log_coinsurance+ num_disease,
              data=UDC)
+summary(model_a)
 ```
 
 
@@ -159,7 +160,7 @@ model_a <- lm(visits~log_income+log_coinsurance+ num_disease,
 
 ```{r}
 
-model_aic<-lm(visits~.-,data=UDC)
+model_aic<-lm(visits~., UDC)
 aic<-MASS::stepAIC(model_aic, direction="both",Trace=F)
 summary(aic)
 
@@ -290,6 +291,8 @@ summary(model_b)
 
 # TRY using lasso: make sure we shrink the number of predictors
 ```{r}
+library(glmnet)
+
 # look at all x's without y's, drop all 1's in the design matrix so can use glmnet
 X<-model.matrix(visits~0+., data=log_data)
 # don't have all the pts, but have all the predictors
@@ -409,6 +412,18 @@ final_model2$results$RMSE
 #see columns of everything data:
 colnames(everything_data3)  
 ```
+
+
+
+
+
+
+
+
+
+
+
+
 # MLR USING UNLOGGED
 # subset the data so it it using the log info and updated binary
 ```{r}
@@ -444,12 +459,13 @@ colnames(X)
 
 # It says to keep 2 and 8 which is physlim and black
 ```{r}
-Lasso_model2<-lm(visits~physlim + black,
+Lasso_model2<-lm(visits~physlim+black,
              data=unlog_data)
 summary(Lasso_model2)
 ```
 ## Assumptions with the lasso model
 ```{r}
+# Plotting residuals
 UDC_pred2 <- mutate(unlog_data, predictions=fitted(Lasso_model2),
                         resid=residuals(Lasso_model))
 ggplot(UDC_pred2, aes(x=predictions, y=resid)) + 
@@ -459,7 +475,7 @@ ggplot(UDC_pred2, aes(x=predictions, y=resid)) +
 
 #
 ```{r}
-#QQ plot for normality assumption:
+# Checking residual normality
 ggplot(UDC_pred2, aes(sample=resid)) +
   stat_qq() +
   stat_qq_line()
@@ -479,48 +495,123 @@ predict(Lasso_model2,unlog_data[c(2,78),] )
 View(unlog_data)
 ```
 
-#
+
+
+
+
+
+
+
+
+
+
+# KAYLA ATTEMPTS
+```{r}
+final_lmodel <- lm(visits~physlim+black+num_disease, data = unlog_data)
+summary(final_lmodel)
+```
+
+```{r}
+# Model coefficients
+coef(final_lmodel)
+```
+
+------------------------ CHECKING MODEL ASSUMPTIONS ----------------------------
+```{r}
+# Checking linearity
+multi_preds <- gather(unlog_data, key = "predictor", value = "value", 
+                      physlim, black, num_disease)
+
+ggplot(multi_preds, aes(x = value, y = visits, color = predictor)) + 
+  geom_point() +
+  facet_wrap(~predictor, scales = "free_x")
+```
+
+```{r}
+# Plotting residuals
+multi_preds2 <- mutate(unlog_data, predictions = fitted(final_lmodel),
+                      resid = residuals(final_lmodel))
+
+ggplot(multi_preds2, aes(x = predictions, y = resid)) + 
+  geom_point() +
+  geom_hline(yintercept = 0, color="red")
+```
+
+```{r}
+# Checking residual normality
+ggplot(multi_preds2, aes(sample = resid)) +
+  stat_qq() +
+  stat_qq_line()
+```
+
+----------------------- CHECKING FOR MULTICOLLINEARITY  ------------------------
+```{r}
+# Creating a correlation matrix to check for multicollinearity
+unlog_data_clean <- select(unlog_data, -c(idp, schooling, age, sex, child, insurance,
+                                          payment, deductible, income, family, condition))
+
+cor_matrix <- round(cor(unlog_data_clean), 2)
+cor_matrix
+```
+
+```{r}
+# Plotting the correlation matrix to check for multicollinearity
+ggcorrplot(cor_matrix, lab = TRUE, type = "lower")
+```
+
+```{r}
+# Looking at VIF to check for multicollinearity
+vif(final_lmodel)
+```
+
+--------------- LOOKING AT INDIVIDUAL PREDICTORS VS COINSURANCE  ---------------
+```{r}
+# Individual predictors' impacts on response (coinsurance)
+avPlots(final_lmodel)
+```
+
+---------------------------- MAKING PREDICTIONS --------------------------------
+```{r}
+# Data for predictions
+final_lmodel2 <- lm(visits~., unlog_data_clean)
+pred_data <- unlog_data_clean[1:2,-1]
+
+# Prediction interval
+predict(final_lmodel2, newdata = pred_data, interval = "prediction", level = 0.95)
+```
+
+```{r}
+# Confidence interval
+predict(final_lmodel2, newdata = pred_data, interval = "confidence", level = 0.95)
+```
+
+```{r}
+pred_data
+```
+
+
+EXTRA 
+```{r}
+testing <-train(visits~physlim+black+num_disease,
+                method = "lm", trControl = control, noninfluence)
+summary(testing)
+
+testing$results$RMSE
+```
+
+
+
+
+ORIGINAL RESEARCH QUESTION
+Are annual family income, co-insurance rate, and number of chronic diseases for an individual statistically significant predictors for the number of doctor visits?
+```{r}
+original_model <- lm(visits~income+insurance+num_disease, unlog_data)
+summary(original_model)
+```
+
 ```{r}
 
 ```
-#
-```{r}
-
-```
-#
-```{r}
-
-```
-#
-```{r}
-
-```
-#
-```{r}
-
-```
-#
-```{r}
-
-```
-#
-```{r}
-
-```
-#
-```{r}
-
-```
-
-
-
-
-
-
-
-
-
-
 
 
 
