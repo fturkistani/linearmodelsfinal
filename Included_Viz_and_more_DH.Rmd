@@ -1,0 +1,293 @@
+---
+title: "DevonCodeFP"
+author: "DH"
+date: "2024-07-25"
+output: html_document
+---
+Data cleaning
+```{r}
+library(tidyverse)
+library(ggplot2)
+library(caret)
+library(pls)
+```
+
+```{r}
+#setwd("C:/Users/chris/Documents/UVA/STAT_6021/FP")
+data<-read.csv('DoctorContacts.csv')
+View(data)
+```
+
+```{r}
+DoctorContacts <- data %>%
+  rename(visits = mdu, log_coinsurance = lc, log_api = lpi,
+         log_max_deductible = fmde, num_disease = ndisease,
+         log_income = linc, log_fam_size = lfam, schooling= educdec)
+```
+
+```{r}
+DoctorContacts$insurance = exp(DoctorContacts$log_coinsurance)
+DoctorContacts$payment = exp(DoctorContacts$log_api)
+DoctorContacts$deductible = exp(DoctorContacts$log_max_deductible)
+DoctorContacts$income = exp(DoctorContacts$log_income)
+DoctorContacts$family = exp(DoctorContacts$log_fam_size)
+View(DoctorContacts)
+```
+The most updated version of the csv is now called DrContactsNew. It includes
+log and sqrt transformations as well as the original raw data(that we had to
+untransform from the log).
+```{r}
+
+```
+Data Visualization
+
+Null hypothesis = There is no relationship between mean health score and education
+Alternative hypothesis = At least one of the means is different from the others
+
+```{r}
+DoctorContacts$health <- factor(DoctorContacts$health, 
+                                levels = c('poor', 'fair', 'good', 'excellent'))
+ggplot(DoctorContacts, aes(x=health, y=schooling, fill=health)) + geom_boxplot()+ ggtitle("Years of Education vs. Self-Reported Health Score") + theme(plot.title = element_text(hjust = 0.5))+ theme(legend.position="none")+labs(x = "Self-Rated Health", y = "Schooling (Years)")
+
+
+```
+
+```{r}
+anova <- aov(schooling~health, data=DoctorContacts)
+summary(anova)
+```
+There is an extremely small p-value here, which provides strong evidence to
+reject the null hypothesis that the family head's years of schooling have no 
+significant difference on how patients self report their own health.
+One thing to note is the very high SSE value (146801). This means that most of
+the variation in the response cannot be explained by a linear regression model.
+This makes sense because since one of these values is categorical, it would be
+difficult to represent it as a linear regression model.
+
+```{r}
+TukeyHSD(anova, conf.level = 0.95)
+```
+These results show that all tests are statistically significant. The mean of
+schooling of people who reported their own health as excellent is higher than
+those who reported good, fair or poor in that order.
+This data is observational, so we can not make cause and effect statements,
+but we are 95% confident...
+
+```{r}
+plot(TukeyHSD(anova))
+```
+Logistic Regression
+```{r}
+drs<-read.csv('DrContactsNew.csv')
+View(drs)
+```
+
+Transform health column into binary as column 'condition'
+Used log data from original data set for this
+```{r}
+ drs1<- DoctorContacts %>%
+  mutate(condition = case_when(
+    health %in% c("poor", "fair") ~ "unhealthy",
+    health %in% c("good", "excellent") ~ "healthy",
+    TRUE ~ as.character(health)
+  ))
+
+View(drs1)
+```
+
+Bar graph shows relationship between condition and sex. (Just for fun)
+```{r}
+ggplot(drs1, aes(x=sex, fill=factor(condition), color=factor(condition)))+
+  geom_bar(position='fill')
+```
+
+
+Make all categoricals factors (0,1)
+```{r}
+drs2<-drs1[, -c(1,9)]%>%
+  mutate(physlim=ifelse(physlim=="TRUE", 1,0),
+         idp=ifelse(idp=="TRUE", 1,0),
+         sex=ifelse(sex=="male", 1,0),
+         child=ifelse(child=="TRUE", 1,0),
+         black=ifelse(black=="TRUE", 1,0),
+         condition=ifelse(condition=="healthy", 1,0))
+View(drs2)
+```
+
+Remove response/unneeded variables, make correlation matrix
+```{r}
+dat<-drs2[, -15]
+cor_mat<-round(cor(dat),2)
+ggcorrplot::ggcorrplot(cor_mat, lab=T, type='lower')
+```
+There is multicollinearity between age and child (to be expected) and
+log_max_deductible and log_coinsurance (also to be expected). I will remove
+log_max_deductible and child.
+
+```{r}
+dat2<-dat[, -c(5,13)]
+cor_mat2<-round(cor(dat2),2)
+ggcorrplot::ggcorrplot(cor_mat2, lab=T, type='lower')
+```
+
+```{r}
+drs3<-drs2[, -c(5,13)]
+```
+
+Create logistic regression model using glm
+```{r}
+logit_model1<-glm(condition~., drs3, family='binomial')
+summary(logit_model1)
+```
+It looks like family size, coinsurance, idp, and sex are not signficant,
+so I will remove them in the next iteration.
+
+```{r}
+logit_model2<-glm(condition~.-idp-log_coinsurance-log_fam_size-sex, drs3, family='binomial')
+summary(logit_model2)
+```
+Yay! Check with AIC
+```{r}
+aic<-MASS::stepAIC(logit_model1, direction='both', trace=F)
+summary(aic)
+```
+Matches logit_model2, yay!
+
+```{r}
+car::vif(logit_model2)
+```
+Low VIF suggests no multicollinearity (also shown by correlation matrix?) Yay!
+
+```{r}
+#visualization of proportion of black folks in dataset
+
+black_count <- sum(DoctorContacts$black)
+non_black_count <- sum(!DoctorContacts$black)
+total_count <- nrow(DoctorContacts)
+
+black_count
+non_black_count
+total_count
+```
+```{r}
+counts <- c(black_count, non_black_count)
+totals <- c(total_count, total_count)
+
+prop.test(counts, totals)
+```
+```{r}
+drs4 <- DoctorContacts %>%
+  mutate(black = ifelse(black == "TRUE", 
+                        "Black Head of Household", 
+                        ifelse(black == "FALSE", 
+                               "Non-Black Head of Household", 
+                               black)))
+
+ggplot(drs4, aes(x=black, y=visits, fill=black))+geom_boxplot()+
+labs(x = "", y = "Number of Annual Doctor Visits")+ ggtitle("Number of Doctor Visits vs. Race") + theme(plot.title = element_text(hjust = 0.5))+ theme(legend.position="none")
+```
+```{r}
+means <- drs4 %>%
+  group_by(black) %>%
+  summarise(mean_visits = mean(visits, na.rm = TRUE))
+means
+```
+```{r}
+t.test(visits~black, data=DoctorContacts)
+
+```
+
+
+```{r}
+data<-read.csv('UpdatedDoctorContacts.csv')
+View(data)
+```
+
+```{r}
+coinsurance<-ggplot(data, aes(x=insurance)) + geom_bar(fill='blue')+
+labs(x = "Co-Insurance Rate", y = "Count")+ ggtitle("Co-Insurance Rates") + theme(plot.title = element_text(hjust = 0.5))+ theme(legend.position="none")
+coinsurance
+```
+```{r}
+data$insurance %>%
+  summary(
+    median = median(values),
+    Q1 = quantile(values, probs = 0.25),
+    Q3 = quantile(values, probs = 0.75)
+  )
+```
+```{r}
+num_disease<-ggplot(data, aes(y=num_disease)) + geom_boxplot(fill='blue', width=0.5)+
+labs(x = "", y = "Number of Chronic Diseases")+ ggtitle("Chronic Diseases") + theme(plot.title = element_text(hjust = 0.5))+ theme(legend.position="none") + xlim(-1,1)
+num_disease
+```
+```{r}
+data$num_disease %>%
+  summary(
+    median = median(values),
+    Q1 = quantile(values, probs = 0.25),
+    Q3 = quantile(values, probs = 0.75)
+  )
+```
+
+```{r}
+visits<-ggplot(data, aes(x=visits)) + geom_bar(fill='blue')+
+labs(x = "Doctor Visits", y = "Count")+ ggtitle("Number of Annual Doctor Visits") + theme(plot.title = element_text(hjust = 0.5))+ theme(legend.position="none")
+visits
+```
+```{r}
+data$visits %>%
+  summary(
+    median = median(values),
+    Q1 = quantile(values, probs = 0.25),
+    Q3 = quantile(values, probs = 0.75)
+  )
+```
+
+```{r}
+deductible<-ggplot(data, aes(y=deductible)) + geom_boxplot(fill='sky blue')+
+labs(x = "", y = "Deductible")+ ggtitle("Deductible Rate") + theme(plot.title = element_text(hjust = 0.5))+ theme(legend.position="none")+ xlim(-1,1)
+deductible
+```
+```{r}
+data$deductible %>%
+  summary(
+    median = median(values),
+    Q1 = quantile(values, probs = 0.25),
+    Q3 = quantile(values, probs = 0.75)
+  )
+```
+
+```{r}
+income<-ggplot(data, aes(y=income)) + geom_boxplot(fill='sky blue')+
+labs(x = "", y = "Annual Income")+ ggtitle("Annual Income") + theme(plot.title = element_text(hjust = 0.5))+ theme(legend.position="none")+xlim(-1,1)
+income
+```
+```{r}
+data$income %>%
+  summary(
+    median = median(values),
+    Q1 = quantile(values, probs = 0.25),
+    Q3 = quantile(values, probs = 0.75)
+  )
+```
+
+```{r}
+payment<-ggplot(data, aes(y=payment)) + geom_boxplot(fill='sky blue')+
+labs(x = "", y = "Payment (USD)")+ ggtitle("Annual Participation Incentive Payment") + theme(plot.title = element_text(hjust = 0.5))+ theme(legend.position="none")+xlim(-1,1)
+payment
+```
+
+```{r}
+data$payment %>%
+  summary(
+    median = median(values),
+    Q1 = quantile(values, probs = 0.25),
+    Q3 = quantile(values, probs = 0.75)
+  )
+```
+
+```{r}
+
+```
+
