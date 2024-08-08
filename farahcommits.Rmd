@@ -44,6 +44,38 @@ ggplot(DoctorContacts, aes(x=health, y=num_disease, fill=health)) + geom_boxplot
 labs(x = "Self-Rated Health", y = "Number of Chronic Diseases")
 ```
 
+
+```{r}
+summary(DoctorContacts$income)
+```
+
+```{r}
+black_household <- DoctorContacts[DoctorContacts$black == TRUE, ]
+black_household
+```
+```{r}
+summary(black_household$income)
+```
+
+```{r}
+notblack_household <- DoctorContacts[DoctorContacts$black == FALSE, ]
+notblack_household
+```
+```{r}
+summary(notblack_household$income)
+```
+
+```{r}
+sd(DoctorContacts$income)
+```
+
+
+```{r}
+ggplot(DoctorContacts, aes(x=physlim, y=deductible, fill=physlim)) + geom_boxplot() +
+labs(x = "Physical Limitation", y = "Deductible Amount")
+```
+
+
 ```{r}
 colnames(DoctorContacts)
 ```

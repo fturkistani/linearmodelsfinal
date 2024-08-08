@@ -63,10 +63,6 @@ summary(aic)
 coef(modeldeductible)
 ```
 
-```{r}
-colnames(DoctorContacts)
-```
-
 
 ```{r}
 preds <- gather(DoctorContacts, key = "predictor", value = "value", schooling,log_fam_size,log_coinsurance,log_income,physlim)
@@ -101,6 +97,161 @@ ggcorrplot(cor_mat, lab=T, type='lower')
 ```
 ```{r}
 vif(modeldeductible)
+
+```
+
+
+```{r}
+avPlots(modeldeductible)
+```
+```{r}
+colnames(DoctorContacts)
+```
+
+```{r}
+cleaned_contacts <- dplyr::select(DoctorContacts, -visits, -idp, -log_api, -log_max_deductible, 
+                                  -num_disease, -health, -age, -sex, -child, -black, -payment, 
+                                  -income, -family, -insurance, -X)
+cleaned_contacts
+```
+
+```{r}
+unduplicate_data <- cleaned_contacts[!duplicated(cleaned_contacts), ]
+unduplicate_data
+```
+
+
+```{r}
+modeldeductible1 <- lm(deductible~., data=unduplicate_data)
+summary(modeldeductible1)
+```
+```{r}
+#exp_pred1 <- mutate(unduplicate_data, predictions=fitted(model0), residual=residuals(model0))
+
+```
+
+```{r}
+#final_multi_coinsurance <- lm(insurance~., multidata_clean_edited)
+#pred_data <- multidata_clean_edited[1:2,-4]
+
+# Prediction interval
+#predict(final_multi_coinsurance, newdata = pred_data, interval = "prediction", level = 0.95)
+```
+
+
+```{r}
+modeleverything <- lm(deductible~.-X, DoctorContacts)
+summary(modeleverything)
+```
+
+
+```{r}
+aic <- MASS::stepAIC(modeleverything, direction = "both", Trace = F)
+summary(aic)
+```
+```{r}
+DoctorContacts <- dplyr::select(DoctorContacts, -log_max_deductible)
+```
+
+
+
+```{r}
+# look at all x's without y's, drop all 1's in the design matrix so can use glmnet
+X_mat<-model.matrix(deductible~0+., data=DoctorContacts)
+# don't have all the pts, but have all the predictors
+Y<-DoctorContacts$deductible
+
+Lmodel_visits<-glmnet(x=X_mat, y=Y, alpha=1)
+# not plot:
+plot(Lmodel_visits, label=TRUE, xvar="lambda")
+```
+
+#
+```{r}
+L_visits_glmnet<-cv.glmnet(x=X_mat,y=Y, alpha=1, nfolds=10)
+L_visits_glmnet$lambda.1se
+```
+#
+```{r}
+plot(Lmodel_visits, label=T, xvar="lambda")+abline(v=log(L_visits_glmnet$lambda.1se))
+```
+
+```{r}
+DoctorContacts
+```
+
+log_coinsurance,idp,physlim, income
+
+```{r}
+lassomodel <- lm(deductible~log_coinsurance+idp+physlim+income, DoctorContacts)
+summary(lassomodel)
+```
+
+
+```{r}
+vif(lassomodel)
+```
+
+```{r}
+colnames(DoctorContacts)
+```
+log_coinsurance,idp,physlim, income, deductible
+
+
+```{r}
+data_for_lasso <- dplyr::select(DoctorContacts, -X, -visits, -log_api, -num_disease, -health,
+                                -log_income,-log_fam_size, -schooling, -age,-sex,-child,
+                                -black,-insurance,-payment,-family)
+data_for_lasso
+```
+
+```{r}
+exp_predlasso <- mutate(data_for_lasso, predictions=fitted(lassomodel), residual=residuals(lassomodel))
+exp_predlasso
+```
+
+
+
+```{r}
+
+ggplot(exp_predlasso, aes(x=predictions, y=residual)) + 
+  geom_point() +
+  geom_hline(yintercept = 0, color="red")
+```
+
+#
+```{r}
+#QQ plot for normality assumption:
+ggplot(exp_predlasso, aes(sample=residual)) +
+  stat_qq() +
+  stat_qq_line()
+```
+
+# Check multicolinearity
+
+```{r}
+car::vif(lassomodel)
+```
+# Make prediction
+```{r}
+#use predict function for that row=2
+predict(lassomodel,exp_predlasso[1:2,-c(4,6,7)] )
+
+pred_data <- exp_predlasso[81:82,-c(4,6,7)] 
+
+predict(lassomodel, newdata = pred_data, interval = "prediction", level = 0.95)
+
+```
+SO BAD
+```{r}
+# Confidence interval
+predict(lassomodel, newdata = pred_data, interval = "confidence", level = 0.95)
+```
+
+SO BAD
+
+
+```{r}
 
 ```
 
