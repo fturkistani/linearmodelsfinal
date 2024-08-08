@@ -13,7 +13,7 @@ library(pls)
 ```
 
 ```{r}
-setwd("C:/Users/chris/Documents/UVA/STAT_6021/FP")
+#setwd("C:/Users/chris/Documents/UVA/STAT_6021/FP")
 data<-read.csv('DoctorContacts.csv')
 View(data)
 ```
@@ -47,7 +47,9 @@ Alternative hypothesis = At least one of the means is different from the others
 ```{r}
 DoctorContacts$health <- factor(DoctorContacts$health, 
                                 levels = c('poor', 'fair', 'good', 'excellent'))
-ggplot(DoctorContacts, aes(x=health, y=schooling, fill=health)) + geom_boxplot()
+ggplot(DoctorContacts, aes(x=health, y=schooling, fill=health)) + geom_boxplot()+ ggtitle("Years of Education vs. Self-Reported Health Score") + theme(plot.title = element_text(hjust = 0.5))+ theme(legend.position="none")+labs(x = "Self-Rated Health", y = "Schooling (Years)")
+
+
 ```
 
 ```{r}
@@ -174,6 +176,118 @@ totals <- c(total_count, total_count)
 prop.test(counts, totals)
 ```
 ```{r}
-ggplot(DoctorContacts, aes(x=black, y=visits, fill=black))+geom_boxplot()
+drs4 <- DoctorContacts %>%
+  mutate(black = ifelse(black == "TRUE", 
+                        "Black Head of Household", 
+                        ifelse(black == "FALSE", 
+                               "Non-Black Head of Household", 
+                               black)))
+
+ggplot(drs4, aes(x=black, y=visits, fill=black))+geom_boxplot()+
+labs(x = "", y = "Number of Annual Doctor Visits")+ ggtitle("Number of Doctor Visits vs. Race") + theme(plot.title = element_text(hjust = 0.5))+ theme(legend.position="none")
+```
+```{r}
+means <- drs4 %>%
+  group_by(black) %>%
+  summarise(mean_visits = mean(visits, na.rm = TRUE))
+means
+```
+```{r}
+t.test(visits~black, data=DoctorContacts)
+
+```
+
+
+```{r}
+data<-read.csv('UpdatedDoctorContacts.csv')
+View(data)
+```
+
+```{r}
+coinsurance<-ggplot(data, aes(x=insurance)) + geom_bar(fill='blue')+
+labs(x = "Co-Insurance Rate", y = "Count")+ ggtitle("Co-Insurance Rates") + theme(plot.title = element_text(hjust = 0.5))+ theme(legend.position="none")
+coinsurance
+```
+```{r}
+data$insurance %>%
+  summary(
+    median = median(values),
+    Q1 = quantile(values, probs = 0.25),
+    Q3 = quantile(values, probs = 0.75)
+  )
+```
+```{r}
+num_disease<-ggplot(data, aes(y=num_disease)) + geom_boxplot(fill='blue', width=0.5)+
+labs(x = "", y = "Number of Chronic Diseases")+ ggtitle("Chronic Diseases") + theme(plot.title = element_text(hjust = 0.5))+ theme(legend.position="none") + xlim(-1,1)
+num_disease
+```
+```{r}
+data$num_disease %>%
+  summary(
+    median = median(values),
+    Q1 = quantile(values, probs = 0.25),
+    Q3 = quantile(values, probs = 0.75)
+  )
+```
+
+```{r}
+visits<-ggplot(data, aes(x=visits)) + geom_bar(fill='blue')+
+labs(x = "Doctor Visits", y = "Count")+ ggtitle("Number of Annual Doctor Visits") + theme(plot.title = element_text(hjust = 0.5))+ theme(legend.position="none")
+visits
+```
+```{r}
+data$visits %>%
+  summary(
+    median = median(values),
+    Q1 = quantile(values, probs = 0.25),
+    Q3 = quantile(values, probs = 0.75)
+  )
+```
+
+```{r}
+deductible<-ggplot(data, aes(y=deductible)) + geom_boxplot(fill='sky blue')+
+labs(x = "", y = "Deductible")+ ggtitle("Deductible Rate") + theme(plot.title = element_text(hjust = 0.5))+ theme(legend.position="none")+ xlim(-1,1)
+deductible
+```
+```{r}
+data$deductible %>%
+  summary(
+    median = median(values),
+    Q1 = quantile(values, probs = 0.25),
+    Q3 = quantile(values, probs = 0.75)
+  )
+```
+
+```{r}
+income<-ggplot(data, aes(y=income)) + geom_boxplot(fill='sky blue')+
+labs(x = "", y = "Annual Income")+ ggtitle("Annual Income") + theme(plot.title = element_text(hjust = 0.5))+ theme(legend.position="none")+xlim(-1,1)
+income
+```
+```{r}
+data$income %>%
+  summary(
+    median = median(values),
+    Q1 = quantile(values, probs = 0.25),
+    Q3 = quantile(values, probs = 0.75)
+  )
+```
+
+```{r}
+payment<-ggplot(data, aes(y=payment)) + geom_boxplot(fill='sky blue')+
+labs(x = "", y = "Payment (USD)")+ ggtitle("Annual Participation Incentive Payment") + theme(plot.title = element_text(hjust = 0.5))+ theme(legend.position="none")+xlim(-1,1)
+payment
+```
+
+```{r}
+data$payment %>%
+  summary(
+    median = median(values),
+    Q1 = quantile(values, probs = 0.25),
+    Q3 = quantile(values, probs = 0.75)
+  )
+```
+
+```{r}
+
 ```
 
